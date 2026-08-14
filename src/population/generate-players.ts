@@ -1,4 +1,4 @@
-import type { ActiveAllianceId, ActivityTier, PowerTier, SimulationConfig } from "../domain/types";
+import type { ActiveAllianceId, ActivityTier, BehaviorStrategy, PowerTier, SimulationConfig } from "../domain/types";
 import type { SeededRng } from "./rng";
 
 export type PlayerStrategy = "frontier" | "value" | "aggressive" | "defensive";
@@ -16,6 +16,7 @@ export interface Player {
   heroCount: number;
   formationProfiles: FormationProfile[];
   strategy: PlayerStrategy;
+  behaviorStrategy: BehaviorStrategy;
   personalScore: number;
   battleScore: number;
   occupationScore: number;
@@ -76,6 +77,7 @@ export function generatePopulation(config: SimulationConfig, rng: SeededRng): Pl
       heroCount: 22,
       formationProfiles: formationProfiles(powerTier, config),
       strategy: rng.pick(STRATEGIES),
+      behaviorStrategy: "multiFront",
       personalScore: 0,
       battleScore: 0,
       occupationScore: 0,

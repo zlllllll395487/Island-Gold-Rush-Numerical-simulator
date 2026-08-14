@@ -49,6 +49,37 @@ describe("simulation configuration", () => {
     expect(parseSimulationConfig(DEFAULT_CONFIG)).toEqual(DEFAULT_CONFIG);
   });
 
+  test("parses the approved strategy defaults", () => {
+    expect(parseSimulationConfig(DEFAULT_CONFIG).strategy).toEqual({
+      shares: { centerRush: 0.45, supportExpand: 0.35, multiFront: 0.2 },
+      activityWeight: 0.55,
+      powerWeight: 0.35,
+      randomWeight: 0.1,
+      centerWeight: 4,
+      resourceWeight: 2,
+      normalWeight: 1,
+      congestionAvoidance: 0.65,
+    });
+  });
+
+  test("rejects strategy shares that do not total one", () => {
+    const invalid = {
+      ...DEFAULT_CONFIG,
+      strategy: {
+        shares: { centerRush: 0.5, supportExpand: 0.35, multiFront: 0.2 },
+        activityWeight: 0.55,
+        powerWeight: 0.35,
+        randomWeight: 0.1,
+        centerWeight: 4,
+        resourceWeight: 2,
+        normalWeight: 1,
+        congestionAvoidance: 0.65,
+      },
+    };
+
+    expect(() => parseSimulationConfig(invalid)).toThrow(/strategy shares must total 1/i);
+  });
+
   test("rejects non-increasing task thresholds", () => {
     const invalid = structuredClone(DEFAULT_CONFIG);
     invalid.tasks.thresholds[4] = invalid.tasks.thresholds[3];

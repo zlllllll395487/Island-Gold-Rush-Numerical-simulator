@@ -23,6 +23,16 @@ export const DEFAULT_CONFIG: SimulationConfig = {
       { id: "core", share: 0.1, usage: 0.9 },
     ],
   },
+  strategy: {
+    shares: { centerRush: 0.45, supportExpand: 0.35, multiFront: 0.2 },
+    activityWeight: 0.55,
+    powerWeight: 0.35,
+    randomWeight: 0.1,
+    centerWeight: 4,
+    resourceWeight: 2,
+    normalWeight: 1,
+    congestionAvoidance: 0.65,
+  },
   morale: {
     base: 150, max: 150, min: 20, safeDistance: 5,
     lossPerExcessHex: 2, lossPerWin: 2, formulaMode: "gdd",
