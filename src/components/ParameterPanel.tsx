@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import type { ChangeEvent } from "react";
 import type { SimulationConfig } from "../domain/types";
+import "./parameter-panel.css";
 import {
   PARAMETER_CATALOG,
   PARAMETER_GROUPS,
@@ -10,9 +11,14 @@ import {
   type ParameterGroupId,
 } from "./parameter-catalog";
 
+export interface ParameterValidationIssue {
+  id: string;
+  message: string;
+}
+
 export interface ParameterPanelProps {
   draft: SimulationConfig;
-  validation: readonly string[];
+  validation: readonly ParameterValidationIssue[];
   onChange: (next: SimulationConfig) => void;
   onReset: () => void;
 }
@@ -56,9 +62,36 @@ function displayValue(entry: ParameterCatalogEntry, value: string | number): str
   return typeof value === "number" ? value * (entry.scale ?? 1) : value;
 }
 
-function parseValue(entry: ParameterCatalogEntry, current: string | number, raw: string): string | number {
+function decimalPlaces(value: number): number {
+  const [, fraction = ""] = String(value).toLowerCase().split(".");
+  if (!fraction.includes("e-")) return fraction.length;
+  const [digits, exponent] = fraction.split("e-");
+  return digits.length + Number(exponent);
+}
+
+function parseValue(
+  entry: ParameterCatalogEntry,
+  current: string | number,
+  raw: string,
+): string | number | null {
   if (entry.control === "select" && typeof current === "string") return raw;
-  return Number(raw) / (entry.scale ?? 1);
+  if (raw.trim() === "") return null;
+
+  const parsed = Number(raw);
+  if (!Number.isFinite(parsed)) return null;
+
+  let displayed = parsed;
+  if (entry.min !== undefined) displayed = Math.max(entry.min, displayed);
+  if (entry.max !== undefined) displayed = Math.min(entry.max, displayed);
+  if (entry.step !== undefined && entry.step > 0) {
+    const origin = entry.min ?? 0;
+    displayed = origin + Math.round((displayed - origin) / entry.step) * entry.step;
+    displayed = Number(displayed.toFixed(decimalPlaces(entry.step)));
+    if (entry.min !== undefined) displayed = Math.max(entry.min, displayed);
+    if (entry.max !== undefined) displayed = Math.min(entry.max, displayed);
+  }
+
+  return displayed / (entry.scale ?? 1);
 }
 
 function totalPercent(status: TotalStatus): number {
@@ -86,7 +119,9 @@ function ParameterControl({
   const shownValue = displayValue(entry, value);
   const id = `parameter-${entry.path.replaceAll(".", "-")}`;
   const change = (event: ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    onChange(updateParameterValue(draft, entry.path, parseValue(entry, value, event.target.value)));
+    const nextValue = parseValue(entry, value, event.target.value);
+    if (nextValue === null) return;
+    onChange(updateParameterValue(draft, entry.path, nextValue));
   };
 
   return (
@@ -207,9 +242,9 @@ export function ParameterPanel({ draft, validation, onChange, onReset }: Paramet
         />
       </label>
 
-      {validation.map((message, index) => (
-        <p className="parameter-validation" role="alert" key={`${message}-${index}`}>
-          {message}
+      {validation.map((issue) => (
+        <p className="parameter-validation" role="alert" key={issue.id}>
+          {issue.message}
         </p>
       ))}
 

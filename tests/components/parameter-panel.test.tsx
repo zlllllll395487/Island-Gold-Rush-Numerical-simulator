@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 import { vi } from "vitest";
@@ -5,6 +7,8 @@ import { ParameterPanel } from "../../src/components/ParameterPanel";
 import { PARAMETER_CATALOG, PARAMETER_GROUPS } from "../../src/components/parameter-catalog";
 import { DEFAULT_CONFIG } from "../../src/domain/defaults";
 import type { SimulationConfig } from "../../src/domain/types";
+
+const parameterPanelStyles = readFileSync(resolve(process.cwd(), "src/components/parameter-panel.css"), "utf8");
 
 const GROUP_NAMES = [
   "基础参数",
@@ -106,7 +110,15 @@ describe("parameter panel", () => {
     expect(container.querySelector('input[type="range"]')).not.toBeNull();
     expect(container.querySelector('input[type="number"]')).not.toBeNull();
     expect(container.querySelector("select")).not.toBeNull();
-    expect(screen.getAllByTestId(/^task-row-/)).toHaveLength(10);
+    const taskRows = screen.getAllByTestId(/^task-row-/);
+    expect(taskRows).toHaveLength(10);
+    expect(taskRows[0]).toHaveClass("parameter-task-row");
+    expect(parameterPanelStyles).toMatch(
+      /\.parameter-panel \.parameter-task-row \{[^}]*display: grid;[^}]*grid-template-columns:/s,
+    );
+    expect(parameterPanelStyles).toMatch(
+      /@media \(max-width: 640px\)[\s\S]*\.parameter-panel \.parameter-task-row \{[^}]*grid-template-columns: minmax\(0, 1fr\)/,
+    );
   });
 
   test("shows the approved 45/25/30 strategy mix", () => {
@@ -142,6 +154,47 @@ describe("parameter panel", () => {
     expect(draft.battleHours).toBe(48);
   });
 
+  test("ignores a blank numeric draft instead of coercing it to zero", () => {
+    const { onChange } = renderPanel();
+
+    fireEvent.change(screen.getByLabelText("战斗时长（小时）"), { target: { value: "" } });
+
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
+  test("ignores numeric overflow instead of emitting Infinity", () => {
+    const { onChange } = renderPanel();
+
+    fireEvent.change(screen.getByLabelText("战斗时长（小时）"), { target: { value: "1e309" } });
+
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
+  test("clamps displayed values to catalog bounds and snaps them to the configured step", () => {
+    const draft = structuredClone(DEFAULT_CONFIG);
+    const { onChange } = renderPanel(draft);
+    const input = screen.getByLabelText("战斗时长（小时）");
+
+    fireEvent.change(input, { target: { value: "0" } });
+    expect((onChange.mock.lastCall?.[0] as SimulationConfig).battleHours).toBe(1);
+
+    fireEvent.change(input, { target: { value: "200" } });
+    expect((onChange.mock.lastCall?.[0] as SimulationConfig).battleHours).toBe(168);
+
+    fireEvent.change(input, { target: { value: "72.6" } });
+    expect((onChange.mock.lastCall?.[0] as SimulationConfig).battleHours).toBe(73);
+    expect(draft.battleHours).toBe(48);
+  });
+
+  test("clamps a scaled percentage in displayed units before applying its scale", () => {
+    const { onChange } = renderPanel();
+
+    fireEvent.change(screen.getByLabelText("任务 1 目标覆盖率"), { target: { value: "250" } });
+
+    const next = onChange.mock.lastCall?.[0] as SimulationConfig;
+    expect(next.tasks.targetCoverage[0]).toBe(1);
+  });
+
   test("delegates restoring defaults to the reset callback", () => {
     const { onReset } = renderPanel();
 
@@ -150,13 +203,44 @@ describe("parameter panel", () => {
     expect(onReset).toHaveBeenCalledTimes(1);
   });
 
+  test("preserves validation issue identity when issues are reordered", () => {
+    const onChange = vi.fn();
+    const onReset = vi.fn();
+    const { rerender } = render(
+      <ParameterPanel
+        draft={DEFAULT_CONFIG}
+        validation={[
+          { id: "ap.initial.too_big", message: "初始 AP 超过上限" },
+          { id: "tasks.thresholds.order", message: "任务阈值必须递增" },
+        ]}
+        onChange={onChange}
+        onReset={onReset}
+      />,
+    );
+    const initialApIssue = screen.getByText("初始 AP 超过上限");
+
+    rerender(
+      <ParameterPanel
+        draft={DEFAULT_CONFIG}
+        validation={[
+          { id: "tasks.thresholds.order", message: "任务阈值必须递增" },
+          { id: "ap.initial.too_big", message: "初始 AP 超过上限" },
+        ]}
+        onChange={onChange}
+        onReset={onReset}
+      />,
+    );
+
+    expect(screen.getByText("初始 AP 超过上限")).toBe(initialApIssue);
+  });
+
   test("keeps draft validation visible and reports invalid dependent totals", () => {
     const draft = structuredClone(DEFAULT_CONFIG);
     draft.strategy.shares.centerRush = 0.5;
     render(
       <ParameterPanel
         draft={draft}
-        validation={["行动力初始值不能超过上限"]}
+        validation={[{ id: "ap.initial.too_big", message: "行动力初始值不能超过上限" }]}
         onChange={vi.fn()}
         onReset={vi.fn()}
       />,

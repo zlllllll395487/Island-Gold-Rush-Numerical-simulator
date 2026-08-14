@@ -1,0 +1,42 @@
+.parameter-panel .parameter-task-row {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.35rem 0.5rem;
+  align-items: end;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid currentColor;
+}
+
+.parameter-panel .parameter-task-row > strong {
+  grid-column: 1 / -1;
+  font-size: 0.75rem;
+}
+
+.parameter-panel .parameter-task-row .parameter-control {
+  display: grid;
+  min-width: 0;
+  gap: 0.2rem;
+}
+
+.parameter-panel .parameter-task-row .parameter-control label {
+  overflow: hidden;
+  font-size: 0.6875rem;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.parameter-panel .parameter-task-row .parameter-control input {
+  width: 100%;
+  min-width: 0;
+}
+
+@media (max-width: 640px) {
+  .parameter-panel .parameter-task-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .parameter-panel .parameter-task-row > strong {
+    grid-column: auto;
+  }
+}
