@@ -1,8 +1,19 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 import { SimulationDashboardV2 as SimulationDashboard } from "../../src/components/SimulationDashboardV2";
+import { DEFAULT_CONFIG } from "../../src/domain/defaults";
 
 describe("simulation dashboard", () => {
+  test("keeps the default high-tier power inside the legacy slider bounds", () => {
+    const { container } = render(<SimulationDashboard />);
+    const slider = container.querySelector<HTMLInputElement>('input[type="range"][step="50000"]');
+
+    expect(slider).not.toBeNull();
+    expect(Number(slider!.min)).toBeLessThanOrEqual(DEFAULT_CONFIG.population.basePower.high);
+    expect(Number(slider!.max)).toBeGreaterThanOrEqual(DEFAULT_CONFIG.population.basePower.high);
+    expect(Number(slider!.value)).toBe(DEFAULT_CONFIG.population.basePower.high);
+  }, 15000);
+
   test("renders the six analysis views and can rerun a match", () => {
     render(<SimulationDashboard />);
     expect(screen.getByRole("heading", { name: /海岛夺金/ })).toBeInTheDocument();

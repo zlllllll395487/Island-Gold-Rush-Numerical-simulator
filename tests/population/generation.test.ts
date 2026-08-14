@@ -85,6 +85,23 @@ describe("matched virtual population", () => {
     expect(Math.max(...powers) / Math.min(...powers)).toBeLessThanOrEqual(1.25);
   });
 
+  test.each([50, 54])("keeps outlier super samples evenly and deterministically matched for seed %i", (seed) => {
+    const first = buildMatchedPopulation(DEFAULT_CONFIG, seed);
+    const second = buildMatchedPopulation(DEFAULT_CONFIG, seed);
+
+    const superCounts = first.alliances.map(
+      (alliance) => alliance.members.filter((player) => player.powerTier === "super").length,
+    );
+    const powers = first.alliances.map(effectiveAlliancePower);
+    const allianceRatio = Math.max(...powers) / Math.min(...powers);
+
+    console.info("MATCHING_CALIBRATION", JSON.stringify({ seed, superCounts, allianceRatio }));
+    expect(first).toEqual(second);
+    expect(first.alliances.map((alliance) => alliance.members.length)).toEqual([100, 100, 100]);
+    expect(superCounts).toEqual([1, 1, 1]);
+    expect(allianceRatio).toBeLessThanOrEqual(1.25);
+  });
+
   test("uses largest-remainder power quotas for arbitrary population sizes", () => {
     const config = structuredClone(DEFAULT_CONFIG);
     config.playersPerAlliance = 101;
