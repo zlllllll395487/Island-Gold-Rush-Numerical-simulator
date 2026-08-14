@@ -29,7 +29,7 @@ export interface ParameterCatalogEntry {
   control: "number" | "range" | "select";
   min?: number;
   max?: number;
-  step?: number;
+  step?: number | "any";
   scale?: number;
   suffix?: string;
   options?: readonly ParameterOption[];
@@ -78,7 +78,7 @@ const ACTIVITY_TIERS = ["极低活跃", "休闲活跃", "普通活跃", "高活�
 
 const populationEntries: ParameterCatalogEntry[] = TIERS.flatMap(([tier, label]) => [
   percent("population", `population.powerShares.${tier}`, `${label}玩家占比`),
-  number("population", `population.basePower.${tier}`, `${label}基础战力`, { min: 1, step: 10_000 }),
+  number("population", `population.basePower.${tier}`, `${label}基础战力`, { min: 10_000, step: 10_000 }),
   number("population", `population.powerSigma.${tier}`, `${label}战力波动`, { min: 0, max: 1, step: 0.01 }),
   number("population", `population.mainFormationCounts.${tier}`, `${label}主力编队数`, { min: 0, max: 6, step: 1 }),
   range("population", `population.weakFormationScale.${tier}`, `${label}普通编队强度`, {
@@ -159,9 +159,9 @@ export const PARAMETER_CATALOG: readonly ParameterCatalogEntry[] = [
   number("ap", "ap.initial", "初始 AP", { min: 0, step: 1 }),
   number("ap", "ap.cap", "AP 上限", { min: 1, step: 1 }),
   number("ap", "ap.recoveryAmount", "每次恢复 AP", { min: 0, step: 1 }),
-  number("ap", "ap.recoveryEveryHours", "AP 恢复间隔（小时）", { min: 0.1, max: 48, step: 0.5 }),
-  number("ap", "ap.attackCost", "进攻 AP 消耗", { min: 0.1, step: 1 }),
-  number("ap", "ap.garrisonCost", "驻守 AP 消耗", { min: 0.1, step: 1 }),
+  number("ap", "ap.recoveryEveryHours", "AP 恢复间隔（小时）", { min: 0.5, max: 48, step: 0.5 }),
+  number("ap", "ap.attackCost", "进攻 AP 消耗", { min: 1, step: 1 }),
+  number("ap", "ap.garrisonCost", "驻守 AP 消耗", { min: 1, step: 1 }),
 
   number("occupation", "occupation.baseSeconds.normal", "普通地格基础占领秒数", { min: 1, step: 1 }),
   number("occupation", "occupation.baseSeconds.resource", "资源地格基础占领秒数", { min: 1, step: 1 }),
@@ -170,15 +170,15 @@ export const PARAMETER_CATALOG: readonly ParameterCatalogEntry[] = [
   number("occupation", "occupation.secondsPerExcessHex", "每格超距增加秒数", { min: 0, max: 3600, step: 5 }),
   range("occupation", "occupation.paceMultiplier", "占领节奏倍率", { min: 1, max: 100, step: 1, suffix: "×" }),
 
-  number("combat", "combat.troopSize", "单编队兵力", { min: 1, step: 1_000 }),
-  number("combat", "combat.battleIntervalSeconds", "战斗结算间隔（秒）", { min: 0.1, step: 1 }),
-  number("combat", "combat.powerExponent", "战力指数", { min: 0.01, step: 0.05 }),
-  number("combat", "combat.winProbabilitySlope", "胜率曲线斜率", { min: 0.01, step: 0.05 }),
+  number("combat", "combat.troopSize", "单编队兵力", { min: 1_000, step: 1_000 }),
+  number("combat", "combat.battleIntervalSeconds", "战斗结算间隔（秒）", { min: 1, step: 1 }),
+  number("combat", "combat.powerExponent", "战力指数", { min: 0.05, step: 0.05 }),
+  number("combat", "combat.winProbabilitySlope", "胜率曲线斜率", { min: 0.05, step: 0.05 }),
   percent("combat", "combat.survivorMinRatio", "最低存活比例"),
   percent("combat", "combat.survivorMaxRatio", "最高存活比例"),
 
-  number("morale", "morale.base", "基础士气", { min: 0.1, step: 1 }),
-  number("morale", "morale.max", "士气上限", { min: 0.1, step: 1 }),
+  number("morale", "morale.base", "基础士气", { min: 1, step: 1 }),
+  number("morale", "morale.max", "士气上限", { min: 1, step: 1 }),
   number("morale", "morale.min", "士气下限", { min: 0, step: 1 }),
   number("morale", "morale.safeDistance", "士气安全距离", { min: 0, step: 1 }),
   number("morale", "morale.lossPerExcessHex", "每格超距士气损失", { min: 0, step: 0.5 }),
@@ -193,13 +193,13 @@ export const PARAMETER_CATALOG: readonly ParameterCatalogEntry[] = [
       { value: "linear", label: "线性公式" },
     ],
   },
-  number("morale", "morale.coefficientIntercept", "士气公式截距", { min: 0, step: 0.0001 }),
-  number("morale", "morale.coefficientSlope", "士气公式斜率", { min: 0, step: 0.0001 }),
+  number("morale", "morale.coefficientIntercept", "士气公式截距", { min: 0, step: "any" }),
+  number("morale", "morale.coefficientSlope", "士气公式斜率", { min: 0, step: "any" }),
 
   number("scoring", "scoring.occupation.normal", "普通地格占领积分", { min: 0, step: 1 }),
   number("scoring", "scoring.occupation.resource", "资源地格占领积分", { min: 0, step: 1 }),
   number("scoring", "scoring.occupation.core", "中心地格占领积分", { min: 0, step: 1 }),
-  number("scoring", "scoring.killsPerPoint", "每点战功所需击杀", { min: 1, step: 100 }),
+  number("scoring", "scoring.killsPerPoint", "每点战功所需击杀", { min: 100, step: 100 }),
 
   ...taskEntries,
   ...["前段", "中段", "高段", "顶段"].map((label, index) =>

@@ -3,7 +3,11 @@ import { resolve } from "node:path";
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 import { vi } from "vitest";
-import { ParameterPanel } from "../../src/components/ParameterPanel";
+import {
+  getParameterValue,
+  normalizeParameterInput,
+  ParameterPanel,
+} from "../../src/components/ParameterPanel";
 import { PARAMETER_CATALOG, PARAMETER_GROUPS } from "../../src/components/parameter-catalog";
 import { DEFAULT_CONFIG } from "../../src/domain/defaults";
 import type { SimulationConfig } from "../../src/domain/types";
@@ -127,6 +131,39 @@ describe("parameter panel", () => {
     expect(screen.getByLabelText("中心争夺策略占比")).toHaveValue("45");
     expect(screen.getByLabelText("支援扩张策略占比")).toHaveValue("25");
     expect(screen.getByLabelText("多线推进策略占比")).toHaveValue("30");
+  });
+
+  test("keeps every rendered default within native min, max, and step constraints", () => {
+    renderPanel();
+    const invalidDefaults: string[] = [];
+
+    for (const entry of PARAMETER_CATALOG) {
+      const control = screen.getByLabelText(entry.label);
+      if (!(control instanceof HTMLInputElement)) continue;
+      if (!control.validity.valid) {
+        invalidDefaults.push(
+          `${entry.path}: value=${control.value}, min=${control.min}, max=${control.max}, step=${control.step}`,
+        );
+      }
+    }
+
+    expect(invalidDefaults).toEqual([]);
+  });
+
+  test("re-entering every displayed default preserves the exact config leaf", () => {
+    renderPanel();
+    const driftedPaths: string[] = [];
+
+    for (const entry of PARAMETER_CATALOG) {
+      const control = screen.getByLabelText(entry.label) as HTMLInputElement | HTMLSelectElement;
+      const current = getParameterValue(DEFAULT_CONFIG, entry.path);
+      const normalized = normalizeParameterInput(entry, current, control.value);
+      if (normalized === null || !Object.is(normalized, current)) {
+        driftedPaths.push(entry.path);
+      }
+    }
+
+    expect(driftedPaths).toEqual([]);
   });
 
   test("filters controls by parameter name without changing the vertical layout", () => {

@@ -59,7 +59,9 @@ export function updateParameterValue(
 }
 
 function displayValue(entry: ParameterCatalogEntry, value: string | number): string | number {
-  return typeof value === "number" ? value * (entry.scale ?? 1) : value;
+  if (typeof value !== "number") return value;
+  const displayed = value * (entry.scale ?? 1);
+  return entry.scale === undefined ? displayed : Number(displayed.toPrecision(12));
 }
 
 function decimalPlaces(value: number): number {
@@ -69,7 +71,7 @@ function decimalPlaces(value: number): number {
   return digits.length + Number(exponent);
 }
 
-function parseValue(
+export function normalizeParameterInput(
   entry: ParameterCatalogEntry,
   current: string | number,
   raw: string,
@@ -83,7 +85,7 @@ function parseValue(
   let displayed = parsed;
   if (entry.min !== undefined) displayed = Math.max(entry.min, displayed);
   if (entry.max !== undefined) displayed = Math.min(entry.max, displayed);
-  if (entry.step !== undefined && entry.step > 0) {
+  if (typeof entry.step === "number" && entry.step > 0) {
     const origin = entry.min ?? 0;
     displayed = origin + Math.round((displayed - origin) / entry.step) * entry.step;
     displayed = Number(displayed.toFixed(decimalPlaces(entry.step)));
@@ -119,7 +121,7 @@ function ParameterControl({
   const shownValue = displayValue(entry, value);
   const id = `parameter-${entry.path.replaceAll(".", "-")}`;
   const change = (event: ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    const nextValue = parseValue(entry, value, event.target.value);
+    const nextValue = normalizeParameterInput(entry, value, event.target.value);
     if (nextValue === null) return;
     onChange(updateParameterValue(draft, entry.path, nextValue));
   };
