@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { MapTile, NormalizedMap, TileId } from "../domain/types";
 import type { Point } from "../map/layout";
 import type { ReplaySnapshot } from "../simulation/engine";
@@ -170,7 +170,7 @@ export function HexMapCanvasV2({ map, snapshot }: { map: NormalizedMap; snapshot
   const layoutRef = useRef<PointyTopLayout | null>(null);
   const [hover, setHover] = useState<{ tileId: TileId; x: number; y: number } | null>(null);
 
-  useEffect(() => {
+  const draw = useCallback(() => {
     const canvas = canvasRef.current;
     const context = canvas?.getContext?.("2d");
     if (!canvas || !context) return;
@@ -212,6 +212,16 @@ export function HexMapCanvasV2({ map, snapshot }: { map: NormalizedMap; snapshot
       }
     }
   }, [map, snapshot, hover?.tileId]);
+
+  useEffect(() => {
+    draw();
+    const canvas = canvasRef.current;
+    const resizeTarget = canvas?.parentElement ?? canvas;
+    if (!resizeTarget || typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(() => draw());
+    observer.observe(resizeTarget);
+    return () => observer.disconnect();
+  }, [draw]);
 
   const onPointerMove = (event: React.PointerEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current;

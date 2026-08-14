@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import rawMap from "../data/tilerush-map.json";
 import { calculateMatchMetrics, summarizeBatch } from "../analytics/metrics";
 import { DEFAULT_CONFIG } from "../domain/defaults";
@@ -20,6 +20,7 @@ const TIERS: readonly PowerTier[] = ["low", "mid", "high", "super"];
 const TIER_NAMES: Record<PowerTier, string> = { low: "低战力", mid: "中战力", high: "高战力", super: "超高战力" };
 const STRATEGY_NAMES: Record<BehaviorStrategy, string> = { centerRush: "中心争夺", supportExpand: "支援扩张", multiFront: "多线推进" };
 const ACTIVITY_NAMES: Record<ActivityTier, string> = { minimal: "极低", casual: "休闲", normal: "普通", active: "活跃", core: "核心" };
+const FIRST_PVP_STATUS_NAMES = { early: "早于目标", target: "命中目标", late: "晚于目标", none: "未发生" } as const;
 
 const simulate = (config: SimulationConfig) => runSimulation({
   map: MAP,
@@ -77,9 +78,37 @@ export function SimulationDashboardV2() {
   const [dirty, setDirty] = useState(false);
   const [running, setRunning] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [compactLayout, setCompactLayout] = useState(false);
+  const toggleRef = useRef<HTMLButtonElement>(null);
+  const sidebarRef = useRef<HTMLElement>(null);
+  const workspaceRef = useRef<HTMLElement>(null);
   const [batchRunning, setBatchRunning] = useState(false);
   const [batch, setBatch] = useState<ReturnType<typeof summarizeBatch> | null>(null);
 
+  useEffect(() => {
+    if (typeof window.matchMedia !== "function") return;
+    const query = window.matchMedia("(max-width: 900px)");
+    const syncCompact = (event?: MediaQueryListEvent) => {
+      const nextCompact = event?.matches ?? query.matches;
+      setCompactLayout(nextCompact);
+      if (!nextCompact) setDrawerOpen(false);
+    };
+    syncCompact();
+    query.addEventListener?.("change", syncCompact);
+    return () => query.removeEventListener?.("change", syncCompact);
+  }, []);
+
+  useEffect(() => {
+    if (!compactLayout || !drawerOpen) return;
+    const frame = window.requestAnimationFrame(() => {
+      sidebarRef.current?.querySelector<HTMLElement>('input[type="search"]')?.focus();
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [compactLayout, drawerOpen]);
+
+  const focusNextFrame = (target: React.RefObject<HTMLElement | null>) => {
+    window.requestAnimationFrame(() => target.current?.focus());
+  };
   const validation = useMemo(() => validateSimulationDraft(draft), [draft]);
   const metrics = useMemo(() => calculateMatchMetrics(result, applied), [result, applied]);
   const snapshot = result.snapshots[Math.min(result.snapshots.length - 1, Math.max(0, Math.round(hour)))];
@@ -96,6 +125,7 @@ export function SimulationDashboardV2() {
     main: applied.population.mainFormationCounts[tier],
     basePower: applied.population.basePower[tier],
   }));
+  const mainFormationHeadline = `${TIERS.map((tier) => applied.population.mainFormationCounts[tier]).join(" / ")} 主力编队`;
   const centerShareByActivity = applied.activity.bands.map((band) => {
     const players = result.players.filter((player) => player.activityTier === band.id);
     return { tier: band.id, share: players.length ? players.filter((player) => player.behaviorStrategy === "centerRush").length / players.length : 0 };
@@ -139,7 +169,7 @@ export function SimulationDashboardV2() {
         const matchMetrics = calculateMatchMetrics(match, config);
         return { firstPvpHour: matchMetrics.firstPvpHour, dominance: matchMetrics.dominance };
       });
-      setBatch(summarizeBatch(rows));
+      setBatch(summarizeBatch(rows, batchConfig.targets.firstPvpHours));
       setBatchRunning(false);
     }, 0);
   };
@@ -152,19 +182,30 @@ export function SimulationDashboardV2() {
   return (
     <main className="simulation-app">
       <button
+        ref={toggleRef}
         className="parameter-drawer-toggle"
         type="button"
         aria-controls="parameter-sidebar"
         aria-expanded={drawerOpen}
-        onClick={() => setDrawerOpen((open) => !open)}
+        onClick={() => {
+          if (drawerOpen) {
+            setDrawerOpen(false);
+            toggleRef.current?.focus();
+          } else {
+            setDrawerOpen(true);
+          }
+        }}
       >
         {drawerOpen ? "收起参数调整" : "展开参数调整"}
       </button>
 
       <aside
+        ref={sidebarRef}
         id="parameter-sidebar"
         className="parameter-sidebar"
         data-open={drawerOpen}
+        inert={compactLayout && !drawerOpen ? true : undefined}
+        aria-hidden={compactLayout && !drawerOpen ? true : undefined}
         data-testid="parameter-sidebar"
         aria-label="模拟参数与页面导航"
       >
@@ -180,7 +221,13 @@ export function SimulationDashboardV2() {
               role="tab"
               aria-selected={tab === name}
               aria-controls="analysis-workspace"
-              onClick={() => { setTab(name); setDrawerOpen(false); }}
+              onClick={() => {
+                setTab(name);
+                if (compactLayout) {
+                  setDrawerOpen(false);
+                  focusNextFrame(workspaceRef);
+                }
+              }}
             >
               {name}
             </button>
@@ -208,7 +255,7 @@ export function SimulationDashboardV2() {
           <article><span>领先联盟</span><strong style={{ color: ALLIANCE_COLORS[leader.id - 1] }}>{leader.name}</strong><small>{leader.snapshotScore} 地图分</small></article>
         </section>
 
-        <section id="analysis-workspace" className="analysis-workspace" data-testid="analysis-workspace">
+        <section ref={workspaceRef} id="analysis-workspace" className="analysis-workspace" data-testid="analysis-workspace" tabIndex={-1}>
           {tab === "仿真总览" && (
             <div className="overview-layout">
               <section className="analysis-card strategy-card">
@@ -223,7 +270,7 @@ export function SimulationDashboardV2() {
                 <div className="table-scroll"><table><thead><tr><th>档位</th><th>玩家数</th><th>实际占比</th><th>基础战力</th><th>主力编队</th></tr></thead><tbody>
                   {tierRows.map((row) => <tr key={row.tier}><th>{TIER_NAMES[row.tier]}</th><td>{row.players}</td><td>{percent(row.share)}</td><td>{compact(row.basePower)}</td><td>{row.main}</td></tr>)}
                 </tbody></table></div>
-                <div className="model-facts"><span>1 / 2 / 3 / 3 主力编队</span><span>{Number((applied.population.basePower.super / applied.population.basePower.low).toFixed(1))}× 超高/低档基础战力</span></div>
+                <div className="model-facts"><span data-testid="main-formation-summary">{mainFormationHeadline}</span><span>{Number((applied.population.basePower.super / applied.population.basePower.low).toFixed(1))}× 超高/低档基础战力</span></div>
               </section>
 
               <section className="analysis-card map-panel">
@@ -243,7 +290,7 @@ export function SimulationDashboardV2() {
           {tab === "行动力与占领" && (
             <div className="content-grid">
               <article className="result-card"><span>总体 AP 使用率</span><strong>{percent(metrics.apUtilization)}</strong><small>恢复溢出 {percent(metrics.apOverflowRate)}</small></article>
-              <article className="result-card"><span>首次 PvP</span><strong>{fmtTime(metrics.firstPvpHour)}</strong><small>状态：{metrics.firstPvpStatus === "target" ? "命中目标" : metrics.firstPvpStatus === "early" ? "早于目标" : "晚于目标"}</small></article>
+              <article className="result-card"><span>首次 PvP</span><strong>{fmtTime(metrics.firstPvpHour)}</strong><small>状态：{FIRST_PVP_STATUS_NAMES[metrics.firstPvpStatus]}</small></article>
               <article className="result-card"><span>已应用占领倍率</span><strong data-testid="applied-pace-multiplier">{applied.occupation.paceMultiplier}×</strong><small>仅运行仿真后更新</small></article>
               <article className="result-card"><span>争夺集中度</span><strong>{metrics.contestConcentration.toFixed(3)}</strong><small>{metrics.uniqueContestedTiles} 个争夺地格</small></article>
               <section className="analysis-card wide-card"><header className="card-heading"><div><p>玩家行为结果</p><h2>各活跃度行动力利用率</h2></div></header><div className="activity-bars">{metrics.activityUtilization.map((row) => <div key={row.tier}><span>{ACTIVITY_NAMES[row.tier]}<small>{row.players} 人</small></span><i><b style={{ width: percent(row.utilization) }} /></i><strong>{percent(row.utilization)}</strong></div>)}</div></section>

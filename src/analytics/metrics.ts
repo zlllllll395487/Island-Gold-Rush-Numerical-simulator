@@ -136,11 +136,15 @@ export function calculateMatchMetrics(result: SimulationResult, config: Simulati
   };
 }
 
-export function summarizeBatch(values: Array<{ firstPvpHour: number | null; dominance: number }>): BatchSummary {
+export function summarizeBatch(
+  values: Array<{ firstPvpHour: number | null; dominance: number }>,
+  targetRange: SimulationConfig["targets"]["firstPvpHours"],
+): BatchSummary {
+  const [targetMin, targetMax] = targetRange;
   const firstPvp = values.flatMap((value) => value.firstPvpHour === null ? [] : [value.firstPvpHour]);
   return {
     firstPvpMedian: median(firstPvp),
-    firstPvpTargetRate: values.length ? values.filter((value) => value.firstPvpHour !== null && value.firstPvpHour >= 3 && value.firstPvpHour <= 6).length / values.length : 0,
+    firstPvpTargetRate: values.length ? values.filter((value) => value.firstPvpHour !== null && value.firstPvpHour >= targetMin && value.firstPvpHour <= targetMax).length / values.length : 0,
     dominanceRisk: values.length ? values.filter((value) => value.dominance >= 0.6).length / values.length : 0,
   };
 }

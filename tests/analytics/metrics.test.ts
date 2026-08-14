@@ -49,12 +49,27 @@ describe("decision metrics", () => {
     }
   });
 
+  test("uses the applied first PvP target range for batch hit rate", () => {
+    const summarizeWithRange = summarizeBatch as unknown as (
+      values: Array<{ firstPvpHour: number | null; dominance: number }>,
+      targetRange: readonly [number, number],
+    ) => ReturnType<typeof summarizeBatch>;
+    const summary = summarizeWithRange([
+      { firstPvpHour: 3, dominance: 0.4 },
+      { firstPvpHour: 4, dominance: 0.4 },
+      { firstPvpHour: 5, dominance: 0.4 },
+      { firstPvpHour: 8, dominance: 0.4 },
+      { firstPvpHour: 9, dominance: 0.4 },
+    ], [5, 8]);
+
+    expect(summary.firstPvpTargetRate).toBe(0.4);
+  });
   test("summarizes batch values with median and risk probabilities", () => {
     const summary = summarizeBatch([
       { firstPvpHour: 2, dominance: 0.7 },
       { firstPvpHour: 4, dominance: 0.45 },
       { firstPvpHour: 6, dominance: 0.4 },
-    ]);
+    ], DEFAULT_CONFIG.targets.firstPvpHours);
     expect(summary.firstPvpMedian).toBe(4);
     expect(summary.firstPvpTargetRate).toBeCloseTo(2 / 3);
     expect(summary.dominanceRisk).toBeCloseTo(1 / 3);
