@@ -88,8 +88,20 @@ describe("local player targeting", () => {
 });
 describe("behavior strategy targeting", () => {
   test("center rush selects the legal candidate closest to the core", () => {
-    const candidates = [candidate({ tileId: 1, distance: 5 }), candidate({ tileId: 2, distance: 2 }), candidate({ tileId: 3, distance: 4, tileType: "resource" })];
+    const candidates = [
+      candidate({ tileId: 1, distance: 5, centerDistance: 5 }),
+      candidate({ tileId: 2, distance: 2, centerDistance: 2 }),
+      candidate({ tileId: 3, distance: 4, centerDistance: 4, tileType: "resource" }),
+    ];
     expect(chooseCenterRushTarget(candidates, strategyConfig, createRng(1))).toBe(2);
+  });
+
+  test("center rush does not use base distance when center distance is absent", () => {
+    const candidates = [
+      candidate({ tileId: 1, distance: 1 }),
+      candidate({ tileId: 2, distance: 6, centerDistance: 4 }),
+    ];
+    expect(chooseCenterRushTarget(candidates, strategyConfig, createRng(11))).toBe(2);
   });
 
   test("center rush measures closeness from the core rather than the player base", () => {
@@ -107,9 +119,9 @@ describe("behavior strategy targeting", () => {
 
   test("center rush breaks equal distances by motivation before congestion", () => {
     const candidates = [
-      candidate({ tileId: 1, distance: 3, tileType: "normal", congestion: 0 }),
-      candidate({ tileId: 2, distance: 3, tileType: "resource", congestion: 4 }),
-      candidate({ tileId: 3, distance: 3, tileType: "resource", congestion: 1 }),
+      candidate({ tileId: 1, distance: 3, centerDistance: 3, tileType: "normal", congestion: 0 }),
+      candidate({ tileId: 2, distance: 3, centerDistance: 3, tileType: "resource", congestion: 4 }),
+      candidate({ tileId: 3, distance: 3, centerDistance: 3, tileType: "resource", congestion: 1 }),
     ];
     expect(chooseCenterRushTarget(candidates, strategyConfig, createRng(3))).toBe(3);
   });
@@ -128,9 +140,25 @@ describe("behavior strategy targeting", () => {
     expect(chooseSupportExpandTarget(candidates, strategyConfig, createRng(5))).toBeNull();
   });
 
+  test("support expansion idles when an occupied fight is the only fight", () => {
+    const candidates = [
+      candidate({ tileId: 1, fighting: true, ownTroopPresent: true, friendlyQueue: 0, enemyQueue: 2 }),
+      candidate({ tileId: 2, ownerCamp: 0 }),
+    ];
+    expect(chooseSupportExpandTarget(candidates, strategyConfig, createRng(13))).toBeNull();
+  });
+
   test("multi-front expansion stays on its assigned front when it has a valid target", () => {
     const candidates = [candidate({ tileId: 1, frontId: "A1-F0", tileType: "normal" }), candidate({ tileId: 2, frontId: "A1-F1", tileType: "core" })];
     expect(chooseMultiFrontTarget(candidates, "A1-F0", strategyConfig, createRng(6))).toBe(1);
+  });
+
+  test("multi-front falls back when its assigned-front fight fails the queue rule", () => {
+    const candidates = [
+      candidate({ tileId: 1, frontId: "A1-F0", fighting: true, friendlyQueue: 5, enemyQueue: 1 }),
+      candidate({ tileId: 2, frontId: "A1-F1", tileType: "resource" }),
+    ];
+    expect(chooseMultiFrontTarget(candidates, "A1-F0", strategyConfig, createRng(14))).toBe(2);
   });
 
   test("multi-front expansion falls back only when its assigned front has no valid target", () => {
