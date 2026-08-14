@@ -1,10 +1,20 @@
-import type { ActivityTier, SimulationConfig } from "../domain/types";
+import type { ActivityTier, BehaviorStrategy, SimulationConfig } from "../domain/types";
 import type { SimulationResult } from "../simulation/engine";
 
 export interface ActivityUtilizationMetric {
   tier: ActivityTier;
   players: number;
   utilization: number;
+}
+
+export interface StrategyMetric {
+  strategy: BehaviorStrategy;
+  players: number;
+  apUtilization: number;
+  score: number;
+  kills: number;
+  occupations: number;
+  centerContestShare: number;
 }
 
 export interface MatchMetrics {
@@ -14,6 +24,8 @@ export interface MatchMetrics {
   apUtilization: number;
   apOverflowRate: number;
   activityUtilization: ActivityUtilizationMetric[];
+  strategyMetrics: StrategyMetric[];
+  centerContestShare: number;
   taskCoverage: number[];
   rewardMarginalValue: number[];
   medianPersonalScore: number;
@@ -22,6 +34,8 @@ export interface MatchMetrics {
   uniqueContestedTiles: number;
   contestConcentration: number;
 }
+
+const BEHAVIOR_STRATEGIES: readonly BehaviorStrategy[] = ["centerRush", "supportExpand", "multiFront"];
 
 export interface BatchSummary {
   firstPvpMedian: number | null;
@@ -56,6 +70,17 @@ export function calculateMatchMetrics(result: SimulationResult, config: Simulati
   const contestConcentration = totalContests
     ? contestCounts.reduce((sum, count) => sum + Math.pow(count / totalContests, 2), 0)
     : 0;
+  const centerTileIds = new Set(result.centerTileIds);
+  const centerContestCount = result.centerTileIds.reduce(
+    (sum, tileId) => sum + (result.contestedTileCounts[tileId] ?? 0),
+    0,
+  );
+  const centerContestShare = totalContests ? Math.min(1, centerContestCount / totalContests) : 0;
+  const dispatches = result.timeline.filter(
+    (event): event is typeof event & { playerId: string; tileId: number } =>
+      event.type === "dispatch" && event.playerId !== undefined && event.tileId !== undefined,
+  );
+  const centerDispatches = dispatches.filter((event) => centerTileIds.has(event.tileId));
 
   const activityUtilization = config.activity.bands.map((band) => {
     const players = result.players.filter((player) => player.activityTier === band.id);
@@ -69,6 +94,25 @@ export function calculateMatchMetrics(result: SimulationResult, config: Simulati
     };
   });
 
+  const strategyMetrics = BEHAVIOR_STRATEGIES.map((strategy): StrategyMetric => {
+    const players = result.players.filter((player) => player.behaviorStrategy === strategy);
+    const playerIds = new Set(players.map((player) => player.id));
+    return {
+      strategy,
+      players: players.length,
+      apUtilization: utilization(
+        players.reduce((sum, player) => sum + player.apSpent, 0),
+        players.reduce((sum, player) => sum + player.apSupply, 0),
+      ),
+      score: players.reduce((sum, player) => sum + player.personalScore, 0),
+      kills: players.reduce((sum, player) => sum + player.kills, 0),
+      occupations: players.reduce((sum, player) => sum + player.occupations, 0),
+      centerContestShare: centerDispatches.length
+        ? centerDispatches.filter((event) => playerIds.has(event.playerId)).length / centerDispatches.length
+        : 0,
+    };
+  });
+
   return {
     firstPvpHour: first,
     firstPvpStatus,
@@ -76,6 +120,8 @@ export function calculateMatchMetrics(result: SimulationResult, config: Simulati
     apUtilization: utilization(totalSpent, totalSupply),
     apOverflowRate: utilization(totalOverflow, totalSupply),
     activityUtilization,
+    strategyMetrics,
+    centerContestShare,
     taskCoverage: config.tasks.thresholds.map((threshold) => result.players.filter((player) => player.personalScore >= threshold).length / result.players.length),
     rewardMarginalValue: config.tasks.thresholds.map((threshold, index) => {
       const previousThreshold = index === 0 ? 0 : config.tasks.thresholds[index - 1];

@@ -6,11 +6,17 @@ import type { Player } from "../population/generate-players";
 import { createRng } from "../population/rng";
 import { recoverAp, spendSquadAp } from "./ap";
 import { enqueueTroop, resolveTileBattleTick } from "./battle-queue";
-import { assignPlayerFronts, buildAllianceFronts, frontForTile, type AllianceFront } from "./fronts";
+import { assignPlayerFronts, buildAllianceFronts, frontForTile } from "./fronts";
 import { calculateMorale } from "./morale";
 import { occupationSeconds, syncOccupation } from "./occupation";
 import type { TileRuntimeState, TroopState } from "./state";
-import { chooseTarget, type TargetCandidate } from "./targeting";
+import {
+  chooseCenterRushTarget,
+  chooseMultiFrontTarget,
+  chooseSupportExpandTarget,
+  type StrategyTargetingConfig,
+  type TargetCandidate,
+} from "./targeting";
 
 const ALLIANCE_IDS: readonly ActiveAllianceId[] = [1, 2, 3];
 
@@ -75,6 +81,7 @@ export interface SimulationResult {
   finalOwners: Record<number, AllianceId>;
   firstPvpHour: number | null;
   contestedTileCounts: Record<number, number>;
+  centerTileIds: TileId[];
   activeFrontIds: string[];
 }
 
@@ -187,12 +194,10 @@ export function runSimulation({ map, config, population, seed }: SimulationInput
   }]));
 
   const activeTileIds = new Set<TileId>();
-  const frontsByAlliance = new Map<ActiveAllianceId, AllianceFront[]>();
   const frontByAllianceTile = new Map<ActiveAllianceId, Map<TileId, string>>();
   const assignmentByPlayer = new Map<string, string>();
   for (const allianceId of ALLIANCE_IDS) {
     const fronts = buildAllianceFronts(map, allianceId, config.fronts.countPerAlliance);
-    frontsByAlliance.set(allianceId, fronts);
     const roster = players.filter((player) => player.allianceId === allianceId);
     for (const [playerId, frontId] of assignPlayerFronts(roster, fronts)) assignmentByPlayer.set(playerId, frontId);
     frontByAllianceTile.set(allianceId, new Map(map.tiles.map((tile) => [tile.tileId, frontForTile(map, tile, fronts)])));
@@ -212,6 +217,14 @@ export function runSimulation({ map, config, population, seed }: SimulationInput
     allianceId,
     map.byConfigId.get(10001)!.find((tile) => tile.camp === allianceId)!,
   ]));
+  const centerTiles = map.byConfigId.get(30003) ?? [];
+  const targetingConfig: StrategyTargetingConfig = {
+    centerWeight: config.strategy.centerWeight,
+    resourceWeight: config.strategy.resourceWeight,
+    normalWeight: config.strategy.normalWeight,
+    congestionAvoidance: config.strategy.congestionAvoidance,
+    supportQueueGap: config.fronts.supportQueueGap,
+  };
   const legalCache = new Map<ActiveAllianceId, TileId[]>();
   const contestedTileCounts = new Map<TileId, number>();
   const activeFrontIds = new Set<string>();
@@ -256,6 +269,9 @@ export function runSimulation({ map, config, population, seed }: SimulationInput
         ownerCamp: state.ownerCamp,
         tileType: tileType(tile),
         distance: cubeDistance(bases.get(allianceId)!, tile),
+        centerDistance: centerTiles.length > 0
+          ? Math.min(...centerTiles.map((centerTile) => cubeDistance(centerTile, tile)))
+          : undefined,
         fighting: state.defenseQueue.length > 0 && state.attackQueue.length > 0,
         ownTroopPresent: [...runtime.activeSlots.values()].some((active) => active.tileId === tileId),
         friendlyQueue,
@@ -276,15 +292,11 @@ export function runSimulation({ map, config, population, seed }: SimulationInput
     if (!profile) return;
 
     const candidates = candidatesFor(runtime);
-    let targetId = chooseTarget(candidates, player.strategy, runtime.primaryFrontId, config.fronts, rng);
-    const hasLocalFight = candidates.some((candidate) => candidate.frontId === runtime.primaryFrontId && candidate.fighting);
-    if (targetId === null && !hasLocalFight) {
-      for (const front of frontsByAlliance.get(player.allianceId)!) {
-        if (front.id === runtime.primaryFrontId) continue;
-        targetId = chooseTarget(candidates, player.strategy, front.id, config.fronts, rng);
-        if (targetId !== null) break;
-      }
-    }
+    const targetId = player.behaviorStrategy === "centerRush"
+      ? chooseCenterRushTarget(candidates, targetingConfig, rng)
+      : player.behaviorStrategy === "supportExpand"
+        ? chooseSupportExpandTarget(candidates, targetingConfig, rng)
+        : chooseMultiFrontTarget(candidates, runtime.primaryFrontId, targetingConfig, rng);
     if (targetId === null) return;
     const spent = spendSquadAp(runtime.heroAp.slice(profile.slot * 3, profile.slot * 3 + 3), config.ap.attackCost);
     if (!spent.ok) return;
@@ -447,6 +459,7 @@ export function runSimulation({ map, config, population, seed }: SimulationInput
     finalOwners: final.owners,
     firstPvpHour,
     contestedTileCounts: Object.fromEntries(contestedTileCounts),
+    centerTileIds: centerTiles.map((tile) => tile.tileId).sort((left, right) => left - right),
     activeFrontIds: [...activeFrontIds].sort(),
   };
 }

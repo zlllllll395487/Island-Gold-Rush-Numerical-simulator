@@ -21,5 +21,10 @@ describe("default scenario calibration", () => {
     expect(metrics.activeFronts).toBeGreaterThanOrEqual(3);
     expect(metrics.uniqueContestedTiles).toBeGreaterThanOrEqual(8);
     expect(metrics.contestConcentration).toBeLessThan(0.35);
+    const alliancePowers = result.alliances.map((alliance) => alliance.effectivePower);
+    expect(Math.max(...alliancePowers) / Math.min(...alliancePowers)).toBeLessThanOrEqual(1.25);
+    expect(metrics.strategyMetrics.map((row) => row.players)).toEqual([135, 105, 60]);
+    expect(metrics.centerContestShare).toBeGreaterThanOrEqual(0);
+    expect(metrics.centerContestShare).toBeLessThanOrEqual(1);
   });
 });

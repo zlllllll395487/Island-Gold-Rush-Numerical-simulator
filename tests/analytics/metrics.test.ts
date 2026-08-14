@@ -1,5 +1,6 @@
 import rawMap from "../../src/data/tilerush-map.json";
 import { DEFAULT_CONFIG } from "../../src/domain/defaults";
+import type { BehaviorStrategy } from "../../src/domain/types";
 import { loadCanonicalMap } from "../../src/map/map-loader";
 import { buildMatchedPopulation } from "../../src/population/match-alliances";
 import { summarizeBatch, calculateMatchMetrics } from "../../src/analytics/metrics";
@@ -19,6 +20,33 @@ describe("decision metrics", () => {
     expect(metrics.apOverflowRate).toBeGreaterThanOrEqual(0);
     expect(metrics.rewardMarginalValue).toHaveLength(10);
     expect(metrics.uniqueContestedTiles).toBeGreaterThan(0);
+  });
+
+  test("reports bounded metrics from the actual results of all three strategies", () => {
+    const map = loadCanonicalMap(rawMap);
+    const result = runSimulation({
+      map,
+      config: DEFAULT_CONFIG,
+      population: buildMatchedPopulation(DEFAULT_CONFIG, 17),
+      seed: 17,
+    });
+    const metrics = calculateMatchMetrics(result, DEFAULT_CONFIG);
+    const strategies: BehaviorStrategy[] = ["centerRush", "supportExpand", "multiFront"];
+
+    expect(metrics.strategyMetrics.map((row) => row.strategy)).toEqual(strategies);
+    expect(metrics.centerContestShare).toBeGreaterThanOrEqual(0);
+    expect(metrics.centerContestShare).toBeLessThanOrEqual(1);
+    for (const row of metrics.strategyMetrics) {
+      const players = result.players.filter((player) => player.behaviorStrategy === row.strategy);
+      expect(row.players).toBe(players.length);
+      expect(row.apUtilization).toBeGreaterThanOrEqual(0);
+      expect(row.apUtilization).toBeLessThanOrEqual(1);
+      expect(row.score).toBe(players.reduce((sum, player) => sum + player.personalScore, 0));
+      expect(row.kills).toBe(players.reduce((sum, player) => sum + player.kills, 0));
+      expect(row.occupations).toBe(players.reduce((sum, player) => sum + player.occupations, 0));
+      expect(row.centerContestShare).toBeGreaterThanOrEqual(0);
+      expect(row.centerContestShare).toBeLessThanOrEqual(1);
+    }
   });
 
   test("summarizes batch values with median and risk probabilities", () => {

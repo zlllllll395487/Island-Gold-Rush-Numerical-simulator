@@ -1,5 +1,6 @@
 import rawMap from "../../src/data/tilerush-map.json";
 import { DEFAULT_CONFIG } from "../../src/domain/defaults";
+import { cubeDistance } from "../../src/map/hex";
 import { loadCanonicalMap } from "../../src/map/map-loader";
 import { buildMatchedPopulation } from "../../src/population/match-alliances";
 import { runSimulation } from "../../src/simulation/engine";
@@ -46,4 +47,34 @@ describe("deterministic match simulation", () => {
     const result = runSimulation({ map, config: DEFAULT_CONFIG, population: buildMatchedPopulation(DEFAULT_CONFIG, 45), seed: 45 });
     expect(result.snapshots.some((snapshot) => Object.keys(snapshot.tileStatus).length > 0)).toBe(true);
   });
+
+  test("routes the default strategy quotas toward their distinct objectives", () => {
+    const result = runSimulation({
+      map,
+      config: DEFAULT_CONFIG,
+      population: buildMatchedPopulation(DEFAULT_CONFIG, DEFAULT_CONFIG.seed),
+      seed: DEFAULT_CONFIG.seed,
+    });
+    const playersById = new Map(result.players.map((player) => [player.id, player]));
+    const coreTiles = map.byConfigId.get(30003)!;
+    const strategyCounts = Object.fromEntries(
+      ["centerRush", "supportExpand", "multiFront"].map((strategy) => [
+        strategy,
+        result.players.filter((player) => player.behaviorStrategy === strategy).length,
+      ]),
+    );
+    const centerDirectedShare = (strategy: "centerRush" | "multiFront") => {
+      const dispatches = result.timeline.filter((event) =>
+        event.type === "dispatch" && event.playerId && playersById.get(event.playerId)?.behaviorStrategy === strategy,
+      );
+      const centerDirected = dispatches.filter((event) => {
+        const tile = map.byId.get(event.tileId!)!;
+        return Math.min(...coreTiles.map((core) => cubeDistance(tile, core))) <= 1;
+      });
+      return centerDirected.length / dispatches.length;
+    };
+
+    expect(strategyCounts).toEqual({ centerRush: 135, supportExpand: 105, multiFront: 60 });
+    expect(centerDirectedShare("centerRush")).toBeGreaterThan(centerDirectedShare("multiFront"));
+  }, 15000);
 });
