@@ -8,5 +8,6 @@ export function calculateMorale(distance: number, consecutiveWins: number, confi
 
 export function moraleMultiplier(morale: number, config: MoraleConfig): number {
   const bounded = Math.max(config.min, Math.min(config.max, morale));
+  if (config.formulaMode === "linear") return bounded / 100;
   return config.coefficientIntercept + config.coefficientSlope * (bounded / 100);
 }

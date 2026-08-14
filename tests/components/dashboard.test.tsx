@@ -105,6 +105,45 @@ describe("simulation dashboard", () => {
     expect(run).toBeEnabled();
   }, 15000);
 
+  test("blocks Run with a stable issue when strategy assignment weights do not total 100%", () => {
+    render(<SimulationDashboard />);
+
+    fireEvent.change(screen.getByLabelText("策略分配活跃度权重"), { target: { value: "60" } });
+
+    expect(screen.getByRole("button", { name: "运行仿真" })).toBeDisabled();
+    const schemaIssue = screen.getAllByRole("alert").find((alert) =>
+      alert.getAttribute("data-validation-id") === "strategy.custom",
+    );
+    expect(schemaIssue).toHaveTextContent("策略分配权重合计必须为 100%");
+  }, 15000);
+
+  test("shows the applied linear morale formula and matching anchors", async () => {
+    render(<SimulationDashboard />);
+    fireEvent.change(screen.getByLabelText("战斗时长（小时）"), { target: { value: "1" } });
+    fireEvent.change(screen.getByLabelText("士气公式模式"), { target: { value: "linear" } });
+    fireEvent.click(screen.getByRole("button", { name: "运行仿真" }));
+    await waitFor(() => expect(screen.getByText("结果已应用")).toBeInTheDocument());
+    fireEvent.click(screen.getByRole("tab", { name: "战斗与士气" }));
+
+    expect(screen.getByText("士气 / 100")).toBeInTheDocument();
+    expect(screen.getByText("士气 20")).toHaveTextContent("20%");
+    expect(screen.getByText("士气 100")).toHaveTextContent("100%");
+    expect(screen.getByText("士气 150")).toHaveTextContent("150%");
+  }, 15000);
+
+  test("shows reward values and marginal values scaled by the applied multiplier", async () => {
+    render(<SimulationDashboard />);
+    fireEvent.change(screen.getByLabelText("战斗时长（小时）"), { target: { value: "1" } });
+    fireEvent.change(screen.getByLabelText("奖励价值倍率"), { target: { value: "2" } });
+    fireEvent.click(screen.getByRole("button", { name: "运行仿真" }));
+    await waitFor(() => expect(screen.getByText("结果已应用")).toBeInTheDocument());
+    fireEvent.click(screen.getByRole("tab", { name: "任务与奖励" }));
+
+    const firstTask = screen.getByRole("row", { name: /^任务 1 / });
+    expect(within(firstTask).getByText("40")).toBeInTheDocument();
+    expect(within(firstTask).getByText("0.200")).toBeInTheDocument();
+  }, 15000);
+
   test("shows actual strategy analytics and the four-tier long-tail population summary", () => {
     render(<SimulationDashboard />);
 

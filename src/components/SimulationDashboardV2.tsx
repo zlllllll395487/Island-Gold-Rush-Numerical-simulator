@@ -43,6 +43,7 @@ const VALIDATION_MESSAGES: Record<string, string> = {
   "population.custom": "人口占比合计必须为 100%",
   "activity.custom": "活跃玩家占比合计必须为 100%",
   "strategy.shares.custom": "策略占比合计必须为 100%",
+  "strategy.custom": "策略分配权重合计必须为 100%",
   "fronts.custom": "战线目标权重合计必须为 100%",
   "morale.custom": "士气必须满足下限 ≤ 基础值 ≤ 上限",
   "combat.custom": "最低存活比例不能高于最高存活比例",
@@ -300,14 +301,14 @@ export function SimulationDashboardV2() {
 
           {tab === "战斗与士气" && (
             <div className="content-grid">
-              <section className="analysis-card formula-card"><p>当前公式</p><h2>士气伤害系数</h2><code>{applied.morale.coefficientIntercept.toFixed(4)} + {applied.morale.coefficientSlope.toFixed(4)} × 士气/100</code><div className="anchor-grid">{[20, 100, 150].map((value) => <span key={value}>士气 {value}<b>{percent(moraleMultiplier(value, applied.morale))}</b></span>)}</div></section>
+              <section className="analysis-card formula-card"><p>当前公式</p><h2>士气伤害系数</h2><code>{applied.morale.formulaMode === "linear" ? "士气 / 100" : `${applied.morale.coefficientIntercept.toFixed(4)} + ${applied.morale.coefficientSlope.toFixed(4)} × 士气/100`}</code><div className="anchor-grid">{[20, 100, 150].map((value) => <span key={value}>士气 {value}<b>{percent(moraleMultiplier(value, applied.morale))}</b></span>)}</div></section>
               <section className="analysis-card matrix-card"><header className="card-heading"><div><p>进攻士气 100 / 防守士气 150</p><h2>战力档对战胜率</h2></div></header><div className="table-scroll"><table><thead><tr><th>进 / 防</th>{TIERS.map((tier) => <th key={tier}>{TIER_NAMES[tier]}</th>)}</tr></thead><tbody>{TIERS.map((attacker) => <tr key={attacker}><th>{TIER_NAMES[attacker]}</th>{TIERS.map((defender) => <td key={defender}>{percent(chance(attacker, defender))}</td>)}</tr>)}</tbody></table></div></section>
               <section className="analysis-card wide-card fact-row"><span>单编队兵力 <b>{compact(applied.combat.troopSize)}</b></span><span>结算间隔 <b>{applied.combat.battleIntervalSeconds} 秒</b></span><span>每点战功击杀 <b>{compact(applied.scoring.killsPerPoint)}</b></span><span>本局 PvP <b>{metrics.pvpEvents} 场</b></span></section>
             </div>
           )}
 
           {tab === "任务与奖励" && (
-            <section className="analysis-card task-results"><header className="card-heading"><div><p>使用已应用参数计算</p><h2>任务达成与奖励结果</h2></div><span>奖励倍率 {applied.rewards.multiplier}×</span></header><div className="table-scroll"><table><thead><tr><th>任务</th><th>积分阈值</th><th>奖励价值</th><th>实际达成率</th><th>目标覆盖率</th><th>边际价值/分</th></tr></thead><tbody>{applied.tasks.thresholds.map((threshold, index) => <tr key={index}><th>任务 {index + 1}</th><td>{threshold}</td><td>{applied.rewards.taskValues[index]}</td><td><span className="coverage-bar"><i style={{ width: percent(metrics.taskCoverage[index]) }} /></span>{percent(metrics.taskCoverage[index])}</td><td>{percent(applied.tasks.targetCoverage[index])}</td><td>{metrics.rewardMarginalValue[index].toFixed(3)}</td></tr>)}</tbody></table></div><div className="reward-distribution">{["前段", "中段", "高段", "顶段"].map((label, index) => <span key={label} style={{ flex: applied.rewards.tierShares[index] }}>{label} {applied.rewards.tierShares[index]}%</span>)}</div></section>
+            <section className="analysis-card task-results"><header className="card-heading"><div><p>使用已应用参数计算</p><h2>任务达成与奖励结果</h2></div><span>奖励倍率 {applied.rewards.multiplier}×</span></header><div className="table-scroll"><table><thead><tr><th>任务</th><th>积分阈值</th><th>奖励价值</th><th>实际达成率</th><th>目标覆盖率</th><th>边际价值/分</th></tr></thead><tbody>{applied.tasks.thresholds.map((threshold, index) => <tr key={index}><th>任务 {index + 1}</th><td>{threshold}</td><td>{metrics.taskRewardValues[index]}</td><td><span className="coverage-bar"><i style={{ width: percent(metrics.taskCoverage[index]) }} /></span>{percent(metrics.taskCoverage[index])}</td><td>{percent(applied.tasks.targetCoverage[index])}</td><td>{metrics.rewardMarginalValue[index].toFixed(3)}</td></tr>)}</tbody></table></div><div className="reward-distribution">{["前段", "中段", "高段", "顶段"].map((label, index) => <span key={label} style={{ flex: applied.rewards.tierShares[index] }}>{label} {applied.rewards.tierShares[index]}%</span>)}</div></section>
           )}
 
           {tab === "玩家与联盟排名" && (

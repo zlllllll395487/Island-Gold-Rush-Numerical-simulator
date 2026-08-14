@@ -148,9 +148,23 @@ describe("behavior strategy targeting", () => {
     expect(chooseSupportExpandTarget(candidates, strategyConfig, createRng(13))).toBeNull();
   });
 
+  test("multi-front changes target when alliance and personal strategy weights are swapped", () => {
+    const candidates = [
+      candidate({ tileId: 1, tileType: "core", ownerCamp: 0, distance: 0 }),
+      candidate({ tileId: 2, tileType: "normal", ownerCamp: 0, distance: 0, enemyQueue: 10 }),
+    ];
+    const allianceOnly = { ...DEFAULT_CONFIG.fronts, allianceObjectiveWeight: 1, personalStrategyWeight: 0 };
+    const personalOnly = { ...DEFAULT_CONFIG.fronts, allianceObjectiveWeight: 0, personalStrategyWeight: 1 };
+
+    expect([
+      chooseMultiFrontTarget(candidates, "A1-F0", strategyConfig, createRng(1), "defensive", allianceOnly),
+      chooseMultiFrontTarget(candidates, "A1-F0", strategyConfig, createRng(1), "defensive", personalOnly),
+    ]).toEqual([1, 2]);
+  });
+
   test("multi-front expansion stays on its assigned front when it has a valid target", () => {
     const candidates = [candidate({ tileId: 1, frontId: "A1-F0", tileType: "normal" }), candidate({ tileId: 2, frontId: "A1-F1", tileType: "core" })];
-    expect(chooseMultiFrontTarget(candidates, "A1-F0", strategyConfig, createRng(6))).toBe(1);
+    expect(chooseMultiFrontTarget(candidates, "A1-F0", strategyConfig, createRng(6), "frontier", DEFAULT_CONFIG.fronts)).toBe(1);
   });
 
   test("multi-front falls back when its assigned-front fight fails the queue rule", () => {
@@ -158,11 +172,11 @@ describe("behavior strategy targeting", () => {
       candidate({ tileId: 1, frontId: "A1-F0", fighting: true, friendlyQueue: 5, enemyQueue: 1 }),
       candidate({ tileId: 2, frontId: "A1-F1", tileType: "resource" }),
     ];
-    expect(chooseMultiFrontTarget(candidates, "A1-F0", strategyConfig, createRng(14))).toBe(2);
+    expect(chooseMultiFrontTarget(candidates, "A1-F0", strategyConfig, createRng(14), "frontier", DEFAULT_CONFIG.fronts)).toBe(2);
   });
 
   test("multi-front expansion falls back only when its assigned front has no valid target", () => {
     const candidates = [candidate({ tileId: 1, frontId: "A1-F0", ownTroopPresent: true }), candidate({ tileId: 2, frontId: "A1-F1", tileType: "resource" })];
-    expect(chooseMultiFrontTarget(candidates, "A1-F0", strategyConfig, createRng(7))).toBe(2);
+    expect(chooseMultiFrontTarget(candidates, "A1-F0", strategyConfig, createRng(7), "frontier", DEFAULT_CONFIG.fronts)).toBe(2);
   });
 });

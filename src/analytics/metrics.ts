@@ -27,6 +27,7 @@ export interface MatchMetrics {
   strategyMetrics: StrategyMetric[];
   centerContestShare: number;
   taskCoverage: number[];
+  taskRewardValues: number[];
   rewardMarginalValue: number[];
   medianPersonalScore: number;
   pvpEvents: number;
@@ -81,6 +82,7 @@ export function calculateMatchMetrics(result: SimulationResult, config: Simulati
       event.type === "dispatch" && event.playerId !== undefined && event.tileId !== undefined,
   );
   const centerDispatches = dispatches.filter((event) => centerTileIds.has(event.tileId));
+  const taskRewardValues = config.rewards.taskValues.map((value) => value * config.rewards.multiplier);
 
   const activityUtilization = config.activity.bands.map((band) => {
     const players = result.players.filter((player) => player.activityTier === band.id);
@@ -123,10 +125,11 @@ export function calculateMatchMetrics(result: SimulationResult, config: Simulati
     strategyMetrics,
     centerContestShare,
     taskCoverage: config.tasks.thresholds.map((threshold) => result.players.filter((player) => player.personalScore >= threshold).length / result.players.length),
+    taskRewardValues,
     rewardMarginalValue: config.tasks.thresholds.map((threshold, index) => {
       const previousThreshold = index === 0 ? 0 : config.tasks.thresholds[index - 1];
-      const previousValue = index === 0 ? 0 : config.rewards.taskValues[index - 1];
-      return (config.rewards.taskValues[index] - previousValue) / Math.max(1, threshold - previousThreshold);
+      const previousValue = index === 0 ? 0 : taskRewardValues[index - 1];
+      return (taskRewardValues[index] - previousValue) / Math.max(1, threshold - previousThreshold);
     }),
     medianPersonalScore: median(personalScores) ?? 0,
     pvpEvents: result.timeline.filter((event) => event.type === "battle").length,

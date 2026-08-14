@@ -46,6 +46,10 @@ describe("default scenario calibration", () => {
       strategyCounts,
       superByAlliance,
       superVsLowWinProbability: duel.attackerWinProbability,
+      apUtilization: metrics.apUtilization,
+      uniqueContestedTiles: metrics.uniqueContestedTiles,
+      contestConcentration: metrics.contestConcentration,
+      centerContestShare: metrics.centerContestShare,
     }));
     expect(tierCounts).toEqual({ low: 225, mid: 60, high: 12, super: 3 });
     expect(superByAlliance).toEqual([1, 1, 1]);

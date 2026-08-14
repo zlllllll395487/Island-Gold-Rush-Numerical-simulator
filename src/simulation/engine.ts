@@ -60,6 +60,11 @@ export interface TimelineEvent {
   troopsKilled?: number;
   winnerTroops?: number;
   defensiveSupport?: boolean;
+  garrison?: boolean;
+  apCost?: number;
+  attackerPlayerId?: string;
+  defenderPlayerId?: string;
+  retainedCenterGarrison?: boolean;
 }
 
 export interface AllianceResult {
@@ -163,7 +168,7 @@ function scheduleOpportunities(players: RuntimePlayer[], totalSeconds: number, c
   const schedule = new Map<number, RuntimePlayer[]>();
   const recoveryCount = Math.max(0, Math.ceil(config.battleHours / config.ap.recoveryEveryHours) - 1);
   const apPerHero = config.ap.initial + recoveryCount * config.ap.recoveryAmount;
-  const potentialCommands = Math.floor((6 * apPerHero) / config.ap.attackCost);
+  const potentialCommands = Math.floor((6 * apPerHero) / Math.min(config.ap.attackCost, config.ap.garrisonCost));
   for (const runtime of players) {
     runtime.player.apSupply = 18 * apPerHero;
     const count = Math.max(1, Math.round(potentialCommands * runtime.player.apUsagePropensity));
@@ -244,6 +249,19 @@ export function runSimulation({ map, config, population, seed }: SimulationInput
     troopRegistry.delete(troopId);
   };
 
+  const releaseNonCenterDefenders = (state: TileRuntimeState): TroopState[] => {
+    const tile = map.byId.get(state.tileId)!;
+    const retained = tileType(tile) === "core"
+      ? state.defenseQueue.filter((unit) => runtimeByPlayer.get(unit.playerId)!.player.behaviorStrategy === "centerRush")
+      : [];
+    const retainedIds = new Set(retained.map((unit) => unit.id));
+    for (const unit of state.defenseQueue) {
+      if (!retainedIds.has(unit.id)) releaseTroop(unit.id);
+    }
+    state.defenseQueue = retained;
+    return retained;
+  };
+
   const legalFor = (allianceId: ActiveAllianceId) => {
     const cached = legalCache.get(allianceId);
     if (cached) return cached;
@@ -272,6 +290,17 @@ export function runSimulation({ map, config, population, seed }: SimulationInput
         && state.attackQueue.length > 0;
       if (friendlyDefensiveFight) ids.add(tileId);
     }
+    if (runtime.player.behaviorStrategy === "centerRush") {
+      for (const core of centerTiles) {
+        const state = states.get(core.tileId)!;
+        const quietFriendlyCore = state.ownerCamp === allianceId
+          && state.defenseCamp === allianceId
+          && connected.has(core.tileId)
+          && state.attackQueue.length === 0
+          && state.occupation === null;
+        if (quietFriendlyCore) ids.add(core.tileId);
+      }
+    }
     return [...ids].map((tileId) => {
       const state = states.get(tileId)!;
       const tile = map.byId.get(tileId)!;
@@ -299,26 +328,36 @@ export function runSimulation({ map, config, population, seed }: SimulationInput
 
   const dispatch = (runtime: RuntimePlayer, second: number) => {
     const player = runtime.player;
-    const profile = player.formationProfiles.find((formation) => {
-      if (runtime.activeSlots.has(formation.slot)) return false;
-      const heroAp = runtime.heroAp.slice(formation.slot * 3, formation.slot * 3 + 3);
-      return heroAp.length === 3 && heroAp.every((ap) => ap >= config.ap.attackCost);
-    });
-    if (!profile) return;
-
     const candidates = candidatesFor(runtime);
     const targetId = player.behaviorStrategy === "centerRush"
       ? chooseCenterRushTarget(candidates, targetingConfig, rng)
       : player.behaviorStrategy === "supportExpand"
         ? chooseSupportExpandTarget(candidates, targetingConfig, rng)
-        : chooseMultiFrontTarget(candidates, runtime.primaryFrontId, targetingConfig, rng);
+        : chooseMultiFrontTarget(candidates, runtime.primaryFrontId, targetingConfig, rng, player.strategy, config.fronts);
     if (targetId === null) return;
-    const spent = spendSquadAp(runtime.heroAp.slice(profile.slot * 3, profile.slot * 3 + 3), config.ap.attackCost);
-    if (!spent.ok) return;
-    spent.remaining.forEach((value, index) => { runtime.heroAp[profile.slot * 3 + index] = value; });
 
     const target = states.get(targetId)!;
     const tile = map.byId.get(targetId)!;
+    const wasFighting = target.defenseQueue.length > 0 && target.attackQueue.length > 0;
+    const defensiveSupport = wasFighting && target.ownerCamp === player.allianceId;
+    const quietFriendlyCoreGarrison = player.behaviorStrategy === "centerRush"
+      && tileType(tile) === "core"
+      && target.ownerCamp === player.allianceId
+      && target.defenseCamp === player.allianceId
+      && target.attackQueue.length === 0
+      && target.occupation === null;
+    const garrison = defensiveSupport || quietFriendlyCoreGarrison;
+    const apCost = garrison ? config.ap.garrisonCost : config.ap.attackCost;
+    const profile = player.formationProfiles.find((formation) => {
+      if (runtime.activeSlots.has(formation.slot)) return false;
+      const heroAp = runtime.heroAp.slice(formation.slot * 3, formation.slot * 3 + 3);
+      return heroAp.length === 3 && heroAp.every((ap) => ap >= apCost);
+    });
+    if (!profile) return;
+    const spent = spendSquadAp(runtime.heroAp.slice(profile.slot * 3, profile.slot * 3 + 3), apCost);
+    if (!spent.ok) return;
+    spent.remaining.forEach((value, index) => { runtime.heroAp[profile.slot * 3 + index] = value; });
+
     const troop: TroopState = {
       id: player.id + "-" + profile.slot + "-" + (++troopSequence),
       playerId: player.id,
@@ -331,8 +370,6 @@ export function runSimulation({ map, config, population, seed }: SimulationInput
       morale: calculateMorale(cubeDistance(bases.get(player.allianceId)!, tile), 0, config.morale),
       entryOrder: troopSequence,
     };
-    const wasFighting = target.defenseQueue.length > 0 && target.attackQueue.length > 0;
-    const defensiveSupport = wasFighting && target.ownerCamp === player.allianceId;
     if (target.defenseQueue.length === 0 && target.attackQueue.length === 0 && target.defenseCamp !== troop.allianceId) {
       target.defenseCamp = troop.allianceId;
       target.defenseQueue.push(troop);
@@ -347,9 +384,18 @@ export function runSimulation({ map, config, population, seed }: SimulationInput
     activeTileIds.add(targetId);
     troopRegistry.set(troop.id, { runtime, slot: profile.slot });
     player.actions += 1;
-    player.apSpent += config.ap.attackCost * 3;
+    player.apSpent += apCost * 3;
     player.maxActiveFormations = Math.max(player.maxActiveFormations, runtime.activeSlots.size);
-    timeline.push({ second, type: "dispatch", tileId: targetId, allianceId: player.allianceId, playerId: player.id, defensiveSupport });
+    timeline.push({
+      second,
+      type: "dispatch",
+      tileId: targetId,
+      allianceId: player.allianceId,
+      playerId: player.id,
+      defensiveSupport,
+      garrison,
+      apCost,
+    });
   };
 
   for (let second = 10; second <= totalSeconds; second += 10) {
@@ -381,6 +427,8 @@ export function runSimulation({ map, config, population, seed }: SimulationInput
       if (state.defenseQueue.length === 0 || state.attackQueue.length === 0) continue;
       const attackerCamp = state.attackQueue[0].allianceId;
       const defenderCamp = state.defenseQueue[0].allianceId;
+      const attackerPlayerId = state.attackQueue[0].playerId;
+      const defenderPlayerId = state.defenseQueue[0].playerId;
       const result = resolveTileBattleTick(state, second, config, rng);
       if (!result.battle) continue;
       pvpCount += 1;
@@ -400,12 +448,13 @@ export function runSimulation({ map, config, population, seed }: SimulationInput
         opponentAllianceId: result.battle.winner === "attacker" ? defenderCamp : attackerCamp,
         troopsKilled: result.battle.winner === "attacker" ? result.battle.attackerKills : result.battle.defenderKills,
         winnerTroops: Math.max(result.battle.attackerRemaining, result.battle.defenderRemaining),
+        attackerPlayerId,
+        defenderPlayerId,
       });
       events.push({ hour: second / 3600, type: "pvp", allianceId: attackerCamp, tileId: state.tileId, previousOwner: state.ownerCamp, playerId: state.defenseQueue[0]?.playerId ?? "" });
 
       if (state.attackQueue.length === 0 && state.defenseCamp === state.ownerCamp && state.occupation === null) {
-        for (const unit of state.defenseQueue) releaseTroop(unit.id);
-        state.defenseQueue = [];
+        releaseNonCenterDefenders(state);
       }
     }
 
@@ -431,11 +480,19 @@ export function runSimulation({ map, config, population, seed }: SimulationInput
       player.occupationScore += points;
       player.occupations += 1;
       events.push({ hour: second / 3600, type: "capture", allianceId: camp, tileId: state.tileId, previousOwner, playerId: player.id });
-      timeline.push({ second, type: "capture", tileId: state.tileId, allianceId: camp, playerId: player.id });
+      let retainedCenterGarrison = false;
       if (state.attackQueue.length === 0) {
-        for (const unit of state.defenseQueue) releaseTroop(unit.id);
-        state.defenseQueue = [];
+        const retained = releaseNonCenterDefenders(state);
+        retainedCenterGarrison = retained.some((unit) => unit.id === occupier.id);
       }
+      timeline.push({
+        second,
+        type: "capture",
+        tileId: state.tileId,
+        allianceId: camp,
+        playerId: player.id,
+        retainedCenterGarrison,
+      });
       if (state.defenseQueue.length === 0 && state.attackQueue.length === 0 && state.occupation === null) activeTileIds.delete(tileId);
     }
 
@@ -445,7 +502,7 @@ export function runSimulation({ map, config, population, seed }: SimulationInput
   }
 
   for (const player of players) {
-    player.battleScore = Math.round(player.kills / config.scoring.killsPerPoint);
+    player.battleScore = Math.floor(player.kills / config.scoring.killsPerPoint);
     player.personalScore = player.battleScore + player.occupationScore;
   }
 

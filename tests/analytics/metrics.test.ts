@@ -22,6 +22,22 @@ describe("decision metrics", () => {
     expect(metrics.uniqueContestedTiles).toBeGreaterThan(0);
   });
 
+  test("scales every marginal task reward from multiplier one to two without mutating base values", () => {
+    const map = loadCanonicalMap(rawMap);
+    const config = structuredClone(DEFAULT_CONFIG);
+    config.battleHours = 1;
+    const result = runSimulation({ map, config, population: buildMatchedPopulation(config, 18), seed: 18 });
+    const baseValues = [...config.rewards.taskValues];
+    const multiplierOne = calculateMatchMetrics(result, config);
+    const doubledConfig = structuredClone(config);
+    doubledConfig.rewards.multiplier = 2;
+    const multiplierTwo = calculateMatchMetrics(result, doubledConfig);
+
+    expect(multiplierTwo.rewardMarginalValue).toEqual(multiplierOne.rewardMarginalValue.map((value) => value * 2));
+    expect(config.rewards.taskValues).toEqual(baseValues);
+    expect(doubledConfig.rewards.taskValues).toEqual(baseValues);
+  });
+
   test("reports bounded metrics from the actual results of all three strategies", () => {
     const map = loadCanonicalMap(rawMap);
     const result = runSimulation({

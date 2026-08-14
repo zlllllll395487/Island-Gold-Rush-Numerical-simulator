@@ -83,6 +83,13 @@ describe("simulation configuration", () => {
     expect(() => parseSimulationConfig(invalid)).toThrow(/strategy shares must total 1/i);
   });
 
+  test("rejects strategy assignment weights that do not total one", () => {
+    const invalid = structuredClone(DEFAULT_CONFIG);
+    invalid.strategy.activityWeight = 0.6;
+
+    expect(() => parseSimulationConfig(invalid)).toThrow(/strategy assignment weights must total 1/i);
+  });
+
   test("rejects non-integer or out-of-range main formation counts", () => {
     const fractional = structuredClone(DEFAULT_CONFIG);
     Object.assign(fractional.population, { mainFormationCounts: { low: 1, mid: 2, high: 2.5, super: 3 } });

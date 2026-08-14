@@ -163,20 +163,29 @@ function chooseMultiFrontFromPool(
   candidates: readonly TargetCandidate[],
   config: StrategyTargetingConfig,
   rng: SeededRng,
+  playerStrategy: PlayerStrategy,
+  frontConfig: FrontTargetingConfig,
 ): number | null {
+  if (candidates.length === 0) return null;
   const fights = candidates.filter((candidate) => candidate.fighting);
   if (fights.length > 0) {
     const supportable = fights.filter((candidate) => candidate.friendlyQueue - candidate.enemyQueue < config.supportQueueGap);
     if (supportable.length === 0) return null;
     const smallestDifference = Math.min(...supportable.map((candidate) => candidate.friendlyQueue - candidate.enemyQueue));
-    return chooseWeightedStrategyTarget(
-      supportable.filter((candidate) => candidate.friendlyQueue - candidate.enemyQueue === smallestDifference),
-      config,
+    const pool = supportable.filter((candidate) => candidate.friendlyQueue - candidate.enemyQueue === smallestDifference);
+    return weightedChoice(
+      pool,
+      pool.map((candidate) => strategyScore(candidate, config) + score(candidate, playerStrategy, frontConfig)),
       rng,
     );
   }
   const neutral = candidates.filter((candidate) => candidate.ownerCamp === 0);
-  return chooseWeightedStrategyTarget(neutral.length > 0 ? neutral : candidates, config, rng);
+  const pool = neutral.length > 0 ? neutral : candidates;
+  return weightedChoice(
+    pool,
+    pool.map((candidate) => strategyScore(candidate, config) + score(candidate, playerStrategy, frontConfig)),
+    rng,
+  );
 }
 
 export function chooseMultiFrontTarget(
@@ -184,10 +193,18 @@ export function chooseMultiFrontTarget(
   primaryFrontId: string,
   config: StrategyTargetingConfig,
   rng: SeededRng,
+  playerStrategy: PlayerStrategy,
+  frontConfig: FrontTargetingConfig,
 ): number | null {
   const legal = legalCandidates(candidates);
   const local = candidatesInFront(legal, primaryFrontId);
-  const localTarget = chooseMultiFrontFromPool(local, config, rng);
+  const localTarget = chooseMultiFrontFromPool(local, config, rng, playerStrategy, frontConfig);
   if (localTarget !== null) return localTarget;
-  return chooseMultiFrontFromPool(legal.filter((candidate) => candidate.frontId !== primaryFrontId), config, rng);
+  return chooseMultiFrontFromPool(
+    legal.filter((candidate) => candidate.frontId !== primaryFrontId),
+    config,
+    rng,
+    playerStrategy,
+    frontConfig,
+  );
 }
