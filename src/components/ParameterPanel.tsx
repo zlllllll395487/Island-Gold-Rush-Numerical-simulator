@@ -245,7 +245,7 @@ export function ParameterPanel({ draft, validation, onChange, onReset }: Paramet
       </label>
 
       {validation.map((issue) => (
-        <p className="parameter-validation" role="alert" key={issue.id}>
+        <p className="parameter-validation" role="alert" data-validation-id={issue.id} key={issue.id}>
           {issue.message}
         </p>
       ))}

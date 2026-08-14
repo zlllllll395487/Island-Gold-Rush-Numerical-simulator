@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { MapTile, NormalizedMap, TileId } from "../domain/types";
-import { flatTopVertices, layoutFlatTopMap, type FlatTopLayout, type Point } from "../map/layout";
+import type { Point } from "../map/layout";
 import type { ReplaySnapshot } from "../simulation/engine";
 
 const CAMP_COLORS = { 0: "#5fa967", 1: "#df5149", 2: "#3188d7", 3: "#e3a522" } as const;
@@ -16,8 +16,45 @@ const TILE_NAMES: Record<number, string> = {
   40002: "\u6c34\u57df",
 };
 
+interface PointyTopLayout {
+  radius: number;
+  centers: Map<TileId, Point>;
+}
+
+function pointyTopCenter(tile: MapTile, size: number): Point {
+  return {
+    x: size * Math.sqrt(3) * (tile.x + tile.z / 2),
+    y: size * 1.5 * tile.z,
+  };
+}
+
+function pointyTopVertices(center: Point, size: number): Point[] {
+  return Array.from({ length: 6 }, (_, index) => {
+    const angle = -Math.PI / 6 + index * Math.PI / 3;
+    return { x: center.x + size * Math.cos(angle), y: center.y + size * Math.sin(angle) };
+  });
+}
+
+function layoutPointyTopMap(tiles: readonly MapTile[], width: number, height: number, padding: number): PointyTopLayout {
+  const rawCenters = new Map(tiles.map((tile) => [tile.tileId, pointyTopCenter(tile, 1)]));
+  const vertices = [...rawCenters.values()].flatMap((center) => pointyTopVertices(center, 1));
+  const minX = Math.min(...vertices.map((point) => point.x));
+  const maxX = Math.max(...vertices.map((point) => point.x));
+  const minY = Math.min(...vertices.map((point) => point.y));
+  const maxY = Math.max(...vertices.map((point) => point.y));
+  const radius = Math.min((width - padding * 2) / (maxX - minX), (height - padding * 2) / (maxY - minY));
+  const offsetX = padding - minX * radius + (width - padding * 2 - (maxX - minX) * radius) / 2;
+  const offsetY = padding - minY * radius + (height - padding * 2 - (maxY - minY) * radius) / 2;
+  return {
+    radius,
+    centers: new Map(tiles.map((tile) => {
+      const raw = rawCenters.get(tile.tileId)!;
+      return [tile.tileId, { x: raw.x * radius + offsetX, y: raw.y * radius + offsetY }];
+    })),
+  };
+}
 function traceHex(context: CanvasRenderingContext2D, center: Point, radius: number) {
-  const points = flatTopVertices(center, radius);
+  const points = pointyTopVertices(center, radius);
   context.beginPath();
   points.forEach((point, index) => index ? context.lineTo(point.x, point.y) : context.moveTo(point.x, point.y));
   context.closePath();
@@ -130,7 +167,7 @@ function fillFor(tile: MapTile, owner: 0 | 1 | 2 | 3) {
 
 export function HexMapCanvasV2({ map, snapshot }: { map: NormalizedMap; snapshot: ReplaySnapshot }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const layoutRef = useRef<FlatTopLayout | null>(null);
+  const layoutRef = useRef<PointyTopLayout | null>(null);
   const [hover, setHover] = useState<{ tileId: TileId; x: number; y: number } | null>(null);
 
   useEffect(() => {
@@ -144,13 +181,13 @@ export function HexMapCanvasV2({ map, snapshot }: { map: NormalizedMap; snapshot
     canvas.height = height * ratio;
     context.setTransform(ratio, 0, 0, ratio, 0, 0);
     context.clearRect(0, 0, width, height);
-    const layout = layoutFlatTopMap(map.tiles, width, height, 14);
+    const layout = layoutPointyTopMap(map.tiles, width, height, 14);
     layoutRef.current = layout;
 
     for (const tile of map.tiles) {
       const center = layout.centers.get(tile.tileId)!;
       const owner = (snapshot.owners[tile.tileId] ?? 0) as 0 | 1 | 2 | 3;
-      traceHex(context, center, layout.radius * 0.985);
+      traceHex(context, center, layout.radius);
       context.fillStyle = fillFor(tile, owner);
       context.fill();
       context.strokeStyle = hover?.tileId === tile.tileId ? "#ffffff" : "rgba(8,24,31,.72)";
@@ -193,11 +230,12 @@ export function HexMapCanvasV2({ map, snapshot }: { map: NormalizedMap; snapshot
   const tile = hover ? map.byId.get(hover.tileId) : null;
   const status = hover ? snapshot.tileStatus[hover.tileId] : null;
   return (
-    <div className="map-canvas-wrap">
+    <div className="map-canvas-wrap" data-orientation="pointy-top">
       <canvas
         ref={canvasRef}
         className="map-canvas"
-        aria-label={"\u6d77\u5c9b\u5730\u56fe\uff0cT+" + snapshot.hour + "\u5c0f\u65f6"}
+        role="img"
+        aria-label={"\u6d77\u5c9b\u5730\u56fe\uff0cT+" + snapshot.hour + "\u5c0f\u65f6\uff0c\u5c16\u9876\u516d\u8fb9\u5f62"}
         onPointerMove={onPointerMove}
         onPointerLeave={() => setHover(null)}
       />

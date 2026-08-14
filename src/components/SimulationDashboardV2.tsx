@@ -1,48 +1,277 @@
 "use client";
+
 import { useMemo, useState } from "react";
 import rawMap from "../data/tilerush-map.json";
 import { calculateMatchMetrics, summarizeBatch } from "../analytics/metrics";
 import { DEFAULT_CONFIG } from "../domain/defaults";
-import type { PowerTier, SimulationConfig } from "../domain/types";
+import { parseSimulationConfig } from "../domain/schemas";
+import type { ActivityTier, BehaviorStrategy, PowerTier, SimulationConfig } from "../domain/types";
 import { loadCanonicalMap } from "../map/map-loader";
 import { buildMatchedPopulation } from "../population/match-alliances";
 import { moraleMultiplier } from "../simulation/morale";
 import { runSimulation } from "../simulation/engine";
 import { HexMapCanvasV2 } from "./HexMapCanvasV2";
+import { ParameterPanel, type ParameterValidationIssue } from "./ParameterPanel";
 
-const MAP=loadCanonicalMap(rawMap), TABS=["仿真总览","行动力与节奏","战斗与士气","任务与奖励","玩家与联盟排名","批量实验"] as const;
-const COLORS=["#ef5d52","#3b96ef","#e7aa2c"], TIERS:PowerTier[]=["low","mid","high","super"], TIER_NAME:Record<PowerTier,string>={low:"低战力",mid:"中战力",high:"高战力",super:"超高战力"};
-const simulate=(config:SimulationConfig,seed:number)=>runSimulation({map:MAP,config,population:buildMatchedPopulation(config,seed),seed});
-const fmt=(value:number|null)=>value===null?"未发生":Math.floor(value)+"小时"+Math.round((value-Math.floor(value))*60)+"分";
-const compact=(value:number)=>new Intl.NumberFormat("zh-CN",{notation:value>999999?"compact":"standard",maximumFractionDigits:1}).format(value);
+const MAP = loadCanonicalMap(rawMap);
+const TABS = ["仿真总览", "行动力与占领", "战斗与士气", "任务与奖励", "玩家与联盟排名", "批量实验"] as const;
+const ALLIANCE_COLORS = ["#dc4c4c", "#2f72d5", "#c89022"];
+const TIERS: readonly PowerTier[] = ["low", "mid", "high", "super"];
+const TIER_NAMES: Record<PowerTier, string> = { low: "低战力", mid: "中战力", high: "高战力", super: "超高战力" };
+const STRATEGY_NAMES: Record<BehaviorStrategy, string> = { centerRush: "中心争夺", supportExpand: "支援扩张", multiFront: "多线推进" };
+const ACTIVITY_NAMES: Record<ActivityTier, string> = { minimal: "极低", casual: "休闲", normal: "普通", active: "活跃", core: "核心" };
 
-export function SimulationDashboardV2(){
- const [tab,setTab]=useState<(typeof TABS)[number]>("仿真总览"),[draft,setDraft]=useState<SimulationConfig>(()=>structuredClone(DEFAULT_CONFIG)),[applied,setApplied]=useState<SimulationConfig>(()=>structuredClone(DEFAULT_CONFIG)),[seed,setSeed]=useState(DEFAULT_CONFIG.seed),[result,setResult]=useState(()=>simulate(DEFAULT_CONFIG,DEFAULT_CONFIG.seed)),[hour,setHour]=useState(48),[dirty,setDirty]=useState(false),[running,setRunning]=useState(false),[batch,setBatch]=useState<ReturnType<typeof summarizeBatch>|null>(null);
- const metrics=useMemo(()=>calculateMatchMetrics(result,applied),[result,applied]), snapshot=result.snapshots[Math.min(result.snapshots.length-1,Math.round(hour))], leader=[...result.alliances].sort((a,b)=>a.rank-b.rank)[0];
- const change=(fn:(config:SimulationConfig)=>void)=>{setDraft(current=>{const next=structuredClone(current);fn(next);return next});setDirty(true)};
- const rerun=()=>{setRunning(true);setTimeout(()=>{const nextSeed=seed+1,next=structuredClone(draft);setResult(simulate(next,nextSeed));setApplied(next);setSeed(nextSeed);setDirty(false);setRunning(false);setBatch(null)},0)};
- const chance=(a:PowerTier,d:PowerTier)=>{const attack=applied.population.basePower[a]*moraleMultiplier(100,applied.morale),defense=applied.population.basePower[d]*moraleMultiplier(150,applied.morale);return 1/(1+Math.exp(-applied.combat.winProbabilitySlope*Math.log(attack/defense)))};
- const recent=result.timeline.filter(event=>event.second<=hour*3600).slice(-7).reverse();
- return <main className="command-shell">
-  <header className="command-header"><div className="brand"><span className="brand-icon">?</span><div><small>TILERUSH · NUMERICAL LAB</small><h1>海岛夺金 数值指挥中心</h1></div></div><div className="run-meta"><span>随机种子 <b>{seed}</b></span><i className={dirty?"dirty":""}>{dirty?"参数待应用":"结果已同步"}</i><button onClick={rerun} disabled={running}>{running?"仿真运行中…":"重新运行单局"}</button></div></header>
-  <section className="kpi-strip"><article><span>首次有效 PvP</span><strong>{fmt(metrics.firstPvpHour)}</strong><small>目标 3～6 小时</small></article><article><span>行动力使用率</span><strong>{Math.round(metrics.apUtilization*100)}%</strong><small>活跃度自然产生</small></article><article><span>活跃战线</span><strong>{metrics.activeFronts}</strong><small>{metrics.uniqueContestedTiles} 个争夺地格</small></article><article><span>争夺集中度</span><strong>{metrics.contestConcentration.toFixed(3)}</strong><small>越低越分散</small></article><article><span>领先联盟</span><strong style={{color:COLORS[leader.id-1]}}>{leader.name}</strong><small>{leader.snapshotScore} 地图分</small></article></section>
-  <div className="command-tabs" role="tablist" aria-label="分析页面">{TABS.map(name=><button key={name} role="tab" aria-selected={tab===name} onClick={()=>setTab(name)}>{name}</button>)}</div>
-  <section className="command-workspace">
-   <aside className="parameter-rail"><div className="rail-title"><div><small>MODEL CONTROL</small><h2>参数实验台</h2></div><button onClick={()=>{setDraft(structuredClone(DEFAULT_CONFIG));setDirty(true)}}>恢复默认</button></div>
-    <details open><summary>人口与战力</summary><label>中战力占比 <output>{Math.round(draft.population.powerShares.mid*100)}%</output><input type="range" min="10" max="35" value={draft.population.powerShares.mid*100} onChange={e=>change(c=>{c.population.powerShares.mid=+e.target.value/100;c.population.powerShares.low=1-c.population.powerShares.mid-c.population.powerShares.high-c.population.powerShares.super})}/></label><label>高战力占比 <output>{Math.round(draft.population.powerShares.high*100)}%</output><input type="range" min="2" max="15" value={draft.population.powerShares.high*100} onChange={e=>change(c=>{c.population.powerShares.high=+e.target.value/100;c.population.powerShares.low=1-c.population.powerShares.mid-c.population.powerShares.high-c.population.powerShares.super})}/></label><label>高档均值 <output>{compact(draft.population.basePower.high)}</output><input type="range" min="1100000" max="5000000" step="50000" value={draft.population.basePower.high} onChange={e=>change(c=>{c.population.basePower.high=+e.target.value})}/></label></details>
-    <details open><summary>行动力与占领</summary><label>AP 消耗 <output>{draft.ap.attackCost}</output><input type="range" min="5" max="25" value={draft.ap.attackCost} onChange={e=>change(c=>{c.ap.attackCost=+e.target.value})}/></label><label>占领节奏倍率 <output>{draft.occupation.paceMultiplier}×</output><input type="range" min="1" max="60" value={draft.occupation.paceMultiplier} onChange={e=>change(c=>{c.occupation.paceMultiplier=+e.target.value})}/></label><label>超距增量 <output>{draft.occupation.secondsPerExcessHex}s</output><input type="range" min="0" max="120" step="5" value={draft.occupation.secondsPerExcessHex} onChange={e=>change(c=>{c.occupation.secondsPerExcessHex=+e.target.value})}/></label></details>
-    <details><summary>战斗与士气</summary><label>士气下限 <output>{draft.morale.min}</output><input type="range" min="0" max="80" value={draft.morale.min} onChange={e=>change(c=>{c.morale.min=+e.target.value})}/></label><label>每格衰减 <output>{draft.morale.lossPerExcessHex}</output><input type="range" min="0" max="10" step=".5" value={draft.morale.lossPerExcessHex} onChange={e=>change(c=>{c.morale.lossPerExcessHex=+e.target.value})}/></label><label>每胜衰减 <output>{draft.morale.lossPerWin}</output><input type="range" min="0" max="10" step=".5" value={draft.morale.lossPerWin} onChange={e=>change(c=>{c.morale.lossPerWin=+e.target.value})}/></label><label>战斗间隔 <output>{draft.combat.battleIntervalSeconds}s</output><input type="range" min="5" max="30" step="5" value={draft.combat.battleIntervalSeconds} onChange={e=>change(c=>{c.combat.battleIntervalSeconds=+e.target.value})}/></label></details>
-    <div className="rule-box"><span>匹配边界</span><strong>最强 / 最弱 ≤ 1.25</strong><small>300 玩家 · 每盟 100 · 六编队</small></div>
-   </aside>
-   <section className="analysis-stage">
-    {tab==="仿真总览"&&<div className="overview-grid"><section className="map-panel"><div className="section-title"><b>T+{snapshot.hour.toFixed(0)}h 战场态势</b><span>{snapshot.activeBattles} 场战斗</span></div><HexMapCanvasV2 map={MAP} snapshot={snapshot}/><label className="timeline"><span>战局回放</span><output>T+{hour}h</output><input aria-label="回放时间" type="range" min="0" max="48" value={hour} onChange={e=>setHour(+e.target.value)}/></label><div className="map-legend"><strong>地格图例</strong>{["普通","资源晶体","核心","山地","水域","交战中"].map((name,index)=><span key={name}><i className={"legend l"+index}/>{name}</span>)}</div></section><aside className="event-list"><div className="section-title"><b>战场事件流</b><span>10 秒粒度</span></div>{recent.map((event,index)=><article key={index}><time>T+{Math.floor(event.second/3600)}:{String(Math.floor(event.second%3600/60)).padStart(2,"0")}</time><div><b>{event.type==="battle"?"队列交战":event.type==="capture"?"完成占领":event.type==="dispatch"?"部队入场":"行动力恢复"}</b><span>{event.tileId?"#"+event.tileId+" 地格":""}{event.troopsKilled?" · 击杀 "+compact(event.troopsKilled):""}</span></div></article>)}</aside></div>}
-    {tab==="行动力与节奏"&&<div className="card-grid"><article className="metric-card"><span>总体 AP 使用率</span><strong>{Math.round(metrics.apUtilization*100)}%</strong><small>恢复溢出 {Math.round(metrics.apOverflowRate*100)}%</small></article><article className="metric-card"><span>首次 PvP</span><strong>{fmt(metrics.firstPvpHour)}</strong><small>占领倍率 {applied.occupation.paceMultiplier}×</small></article><section className="wide-card"><div className="section-title"><b>不同活跃玩家的实际行动力使用</b><span>结果指标，不是节奏旋钮</span></div><div className="activity-bars">{metrics.activityUtilization.map((row,index)=><div key={row.tier}><span>{["极低","休闲","普通","活跃","核心"][index]}<small>{row.players} 人</small></span><i><b style={{width:row.utilization*100+"%"}}/></i><strong>{Math.round(row.utilization*100)}%</strong></div>)}</div></section><section className="wide-card formula"><b>唯一 PvP 节奏控制公式</b><code>(基础时长 + max(0, 基地距离 ? {applied.occupation.safeDistance}) × {applied.occupation.secondsPerExcessHex}s) × {applied.occupation.paceMultiplier}</code></section></div>}
-    {tab==="战斗与士气"&&<div className="combat-grid"><section className="formula-card"><small>CURRENT GDD FORMULA</small><h2>士气伤害系数</h2><code>{applied.morale.coefficientIntercept.toFixed(4)} + {applied.morale.coefficientSlope.toFixed(4)} × 士气/100</code><div className="anchors">{[20,100,150].map(value=><span key={value}>士气 {value}<b>{Math.round(moraleMultiplier(value,applied.morale)*100)}%</b></span>)}</div><p>超过安全距离每格 ?{applied.morale.lossPerExcessHex}，每次连胜 ?{applied.morale.lossPerWin}。</p></section><section className="matrix-card"><div className="section-title"><b>战力档对战胜率</b><span>进攻士气100 / 防守150</span></div><table><thead><tr><th>进 / 防</th>{TIERS.map(t=><th key={t}>{TIER_NAME[t]}</th>)}</tr></thead><tbody>{TIERS.map(a=><tr key={a}><th>{TIER_NAME[a]}</th>{TIERS.map(d=><td key={d}>{Math.round(chance(a,d)*100)}%</td>)}</tr>)}</tbody></table></section><section className="wide-card battle-facts"><span>单队 <b>{compact(applied.combat.troopSize)}</b></span><span>每场 <b>{applied.combat.battleIntervalSeconds} 秒</b></span><span>战功 <b>{compact(applied.scoring.killsPerPoint)}兵 : 1</b></span><span>本局 <b>{metrics.pvpEvents} 场</b></span></section></div>}
-    {tab==="任务与奖励"&&<section className="task-panel"><div className="section-title"><div><b>任务—积分—奖励耦合</b><p>修改阈值与奖励价值后重新仿真。</p></div><span>统一奖励价值单位</span></div><div className="task-table"><table><thead><tr><th>档位</th><th>积分阈值</th><th>奖励价值</th><th>达成率</th><th>边际价值/分</th></tr></thead><tbody>{draft.tasks.thresholds.map((threshold,index)=><tr key={index}><td>任务 {index+1}</td><td><input type="number" value={threshold} onChange={e=>change(c=>{c.tasks.thresholds[index]=+e.target.value})}/></td><td><input type="number" value={draft.rewards.taskValues[index]} onChange={e=>change(c=>{c.rewards.taskValues[index]=+e.target.value})}/></td><td><div className="coverage"><i style={{width:metrics.taskCoverage[index]*100+"%"}}/><span>{Math.round(metrics.taskCoverage[index]*100)}%</span></div></td><td>{metrics.rewardMarginalValue[index].toFixed(3)}</td></tr>)}</tbody></table></div><div className="reward-bar"><span>前段40%</span><span>中段35%</span><span>高段20%</span><span>顶段5%</span></div></section>}
-    {tab==="玩家与联盟排名"&&<section className="rank-panel"><div className="podium">{[...result.alliances].sort((a,b)=>a.rank-b.rank).map(a=><article key={a.id} style={{borderColor:COLORS[a.id-1]}}><span>第 {a.rank} 名</span><h2>{a.name}</h2><strong>{a.snapshotScore}</strong><small>地图分 · {a.tileCount}格 · 累计贡献 {a.contributionScore}</small></article>)}</div><div className="rank-table"><table><thead><tr><th>#</th><th>玩家</th><th>联盟</th><th>战力</th><th>活跃</th><th>行动</th><th>AP使用</th><th>击杀兵量</th><th>战功</th><th>占领</th><th>连胜</th><th>总分</th></tr></thead><tbody>{result.players.map((p,index)=><tr key={p.id}><td>{index+1}</td><td><b>{p.name}</b><small>{TIER_NAME[p.powerTier]}</small></td><td><i style={{background:COLORS[p.allianceId-1]}}/>{p.allianceId}</td><td>{compact(p.power)}</td><td>{p.activityTier}</td><td>{p.actions}</td><td>{Math.round(p.apSpent/Math.max(1,p.apSupply)*100)}%</td><td>{compact(p.kills)}</td><td>{p.battleScore}</td><td>{p.occupationScore}</td><td>{p.maxWinStreak}</td><td><b>{p.personalScore}</b></td></tr>)}</tbody></table></div></section>}
-    {tab==="批量实验"&&<section className="batch-panel"><small>MONTE CARLO EXPERIMENT</small><h2>多随机种子稳定性实验</h2><p>重复生成 300 名玩家与完整 48 小时战局，排除单局偶然性。</p><div><select value={draft.batchRuns} onChange={e=>change(c=>{c.batchRuns=+e.target.value as 10|50|100})}><option value="10">10局快速</option><option value="50">50局标准</option><option value="100">100局高置信</option></select><button disabled={running} onClick={()=>{setRunning(true);setTimeout(()=>{const rows=Array.from({length:draft.batchRuns},(_,i)=>{const r=simulate(draft,seed+i+1),m=calculateMatchMetrics(r,draft);return{firstPvpHour:m.firstPvpHour,dominance:m.dominance}});setBatch(summarizeBatch(rows));setRunning(false)},0)}}>{running?"实验运行中…":"运行批量实验"}</button></div>{batch&&<div className="batch-results"><article><span>PvP中位数</span><strong>{fmt(batch.firstPvpMedian)}</strong></article><article><span>目标命中率</span><strong>{Math.round(batch.firstPvpTargetRate*100)}%</strong></article><article><span>统治风险</span><strong>{Math.round(batch.dominanceRisk*100)}%</strong></article></div>}</section>}
-   </section>
-   <aside className="decision-rail"><small>DECISION SIGNALS</small><article><span>节奏诊断</span><strong>{metrics.firstPvpStatus==="target"?"命中目标":metrics.firstPvpStatus==="early"?"接敌过早":"接敌偏晚"}</strong><small>{fmt(metrics.firstPvpHour)}</small></article><article><span>行动力供需</span><strong>{Math.round(metrics.apUtilization*100)}%</strong><small>目标约50%</small></article><article><span>争夺集中度</span><strong>{metrics.contestConcentration.toFixed(3)}</strong><small>{metrics.uniqueContestedTiles}格</small></article><div className="diagnosis"><b>本局建议</b><p>{metrics.firstPvpStatus==="early"?"提高占领节奏倍率，不要压低玩家行动率。":metrics.contestConcentration>=.35?"提高拥堵惩罚或增加战线。":metrics.apOverflowRate>.4?"恢复溢出偏高，可调整恢复量或上限。":"节奏、战线和行动力处于健康区间。"}</p></div></aside>
-  </section>
- </main>
+const simulate = (config: SimulationConfig) => runSimulation({
+  map: MAP,
+  config,
+  population: buildMatchedPopulation(config, config.seed),
+  seed: config.seed,
+});
+
+const fmtTime = (value: number | null) => value === null
+  ? "未发生"
+  : `${Math.floor(value)}小时${Math.round((value - Math.floor(value)) * 60)}分`;
+const compact = (value: number) => new Intl.NumberFormat("zh-CN", {
+  notation: value > 999_999 ? "compact" : "standard",
+  maximumFractionDigits: 1,
+}).format(value);
+const percent = (value: number) => `${Math.round(value * 100)}%`;
+
+const VALIDATION_MESSAGES: Record<string, string> = {
+  "ap.custom": "初始 AP 不能超过 AP 上限",
+  "population.custom": "人口占比合计必须为 100%",
+  "activity.custom": "活跃玩家占比合计必须为 100%",
+  "strategy.shares.custom": "策略占比合计必须为 100%",
+  "fronts.custom": "战线目标权重合计必须为 100%",
+  "morale.custom": "士气必须满足下限 ≤ 基础值 ≤ 上限",
+  "combat.custom": "最低存活比例不能高于最高存活比例",
+  "tasks.custom": "任务积分阈值必须严格递增",
+  "rewards.custom": "奖励占比合计必须为 100%",
+  "targets.custom": "首次 PvP 目标下限必须低于上限",
+};
+
+export function validateSimulationDraft(config: SimulationConfig): ParameterValidationIssue[] {
+  try {
+    parseSimulationConfig(config);
+    return [];
+  } catch (error) {
+    const issues = (error as { issues?: Array<{ code?: string; path?: PropertyKey[]; message?: string }> }).issues ?? [];
+    return issues.map((issue, index) => {
+      const path = issue.path?.map(String).join(".") || "config";
+      const id = `${path}.${issue.code ?? "invalid"}`;
+      return { id, message: VALIDATION_MESSAGES[id] ?? issue.message ?? `参数校验失败 ${index + 1}` };
+    });
+  }
+}
+
+function sameConfig(left: SimulationConfig, right: SimulationConfig) {
+  return JSON.stringify(left) === JSON.stringify(right);
+}
+
+export function SimulationDashboardV2() {
+  const [tab, setTab] = useState<(typeof TABS)[number]>("仿真总览");
+  const [draft, setDraft] = useState<SimulationConfig>(() => structuredClone(DEFAULT_CONFIG));
+  const [applied, setApplied] = useState<SimulationConfig>(() => structuredClone(DEFAULT_CONFIG));
+  const [result, setResult] = useState(() => simulate(DEFAULT_CONFIG));
+  const [hour, setHour] = useState(DEFAULT_CONFIG.battleHours);
+  const [dirty, setDirty] = useState(false);
+  const [running, setRunning] = useState(false);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [batchRunning, setBatchRunning] = useState(false);
+  const [batch, setBatch] = useState<ReturnType<typeof summarizeBatch> | null>(null);
+
+  const validation = useMemo(() => validateSimulationDraft(draft), [draft]);
+  const metrics = useMemo(() => calculateMatchMetrics(result, applied), [result, applied]);
+  const snapshot = result.snapshots[Math.min(result.snapshots.length - 1, Math.max(0, Math.round(hour)))];
+  const sortedAlliances = [...result.alliances].sort((left, right) => left.rank - right.rank);
+  const leader = sortedAlliances[0];
+  const totalPowerByAlliance = result.alliances.map((alliance) =>
+    result.players.filter((player) => player.allianceId === alliance.id).reduce((sum, player) => sum + player.power, 0),
+  );
+  const alliancePowerRatio = Math.max(...totalPowerByAlliance) / Math.max(1, Math.min(...totalPowerByAlliance));
+  const tierRows = TIERS.map((tier) => ({
+    tier,
+    players: result.players.filter((player) => player.powerTier === tier).length,
+    share: result.players.filter((player) => player.powerTier === tier).length / result.players.length,
+    main: applied.population.mainFormationCounts[tier],
+    basePower: applied.population.basePower[tier],
+  }));
+  const centerShareByActivity = applied.activity.bands.map((band) => {
+    const players = result.players.filter((player) => player.activityTier === band.id);
+    return { tier: band.id, share: players.length ? players.filter((player) => player.behaviorStrategy === "centerRush").length / players.length : 0 };
+  });
+  const centerShareByPower = TIERS.map((tier) => {
+    const players = result.players.filter((player) => player.powerTier === tier);
+    return { tier, share: players.length ? players.filter((player) => player.behaviorStrategy === "centerRush").length / players.length : 0 };
+  });
+
+  const updateDraft = (next: SimulationConfig) => {
+    setDraft(next);
+    setDirty(!sameConfig(next, applied));
+  };
+  const resetDraft = () => {
+    const next = structuredClone(DEFAULT_CONFIG);
+    setDraft(next);
+    setDirty(!sameConfig(next, applied));
+  };
+  const rerun = () => {
+    if (running || validation.length > 0) return;
+    const next = structuredClone(draft);
+    setRunning(true);
+    setTimeout(() => {
+      const nextResult = simulate(next);
+      setResult(nextResult);
+      setApplied(next);
+      setHour(next.battleHours);
+      setDirty(false);
+      setBatch(null);
+      setRunning(false);
+    }, 0);
+  };
+  const runBatch = () => {
+    if (batchRunning) return;
+    const batchConfig = structuredClone(applied);
+    setBatchRunning(true);
+    setTimeout(() => {
+      const rows = Array.from({ length: batchConfig.batchRuns }, (_, index) => {
+        const config = { ...batchConfig, seed: batchConfig.seed + index + 1 };
+        const match = simulate(config);
+        const matchMetrics = calculateMatchMetrics(match, config);
+        return { firstPvpHour: matchMetrics.firstPvpHour, dominance: matchMetrics.dominance };
+      });
+      setBatch(summarizeBatch(rows));
+      setBatchRunning(false);
+    }, 0);
+  };
+  const chance = (attacker: PowerTier, defender: PowerTier) => {
+    const attack = applied.population.basePower[attacker] * moraleMultiplier(100, applied.morale);
+    const defense = applied.population.basePower[defender] * moraleMultiplier(150, applied.morale);
+    return 1 / (1 + Math.exp(-applied.combat.winProbabilitySlope * Math.log(attack / defense)));
+  };
+
+  return (
+    <main className="simulation-app">
+      <button
+        className="parameter-drawer-toggle"
+        type="button"
+        aria-controls="parameter-sidebar"
+        aria-expanded={drawerOpen}
+        onClick={() => setDrawerOpen((open) => !open)}
+      >
+        {drawerOpen ? "收起参数调整" : "展开参数调整"}
+      </button>
+
+      <aside
+        id="parameter-sidebar"
+        className="parameter-sidebar"
+        data-open={drawerOpen}
+        data-testid="parameter-sidebar"
+        aria-label="模拟参数与页面导航"
+      >
+        <header className="product-brand">
+          <span className="product-mark" aria-hidden="true">岛</span>
+          <div><h1>海岛夺金 数值模拟</h1><p>数值分析工作区</p></div>
+        </header>
+        <div className="analysis-tabs" role="tablist" aria-label="分析页面">
+          {TABS.map((name) => (
+            <button
+              key={name}
+              type="button"
+              role="tab"
+              aria-selected={tab === name}
+              aria-controls="analysis-workspace"
+              onClick={() => { setTab(name); setDrawerOpen(false); }}
+            >
+              {name}
+            </button>
+          ))}
+        </div>
+        <ParameterPanel draft={draft} validation={validation} onChange={updateDraft} onReset={resetDraft} />
+      </aside>
+
+      <section className="analysis-shell">
+        <header className="analysis-header">
+          <div>
+            <p>当前应用种子 {applied.seed}</p>
+            <strong className={dirty ? "draft-status is-dirty" : "draft-status"}>{dirty ? "草稿待运行" : "结果已应用"}</strong>
+          </div>
+          <button className="run-button" type="button" onClick={rerun} disabled={running || validation.length > 0}>
+            {running ? "仿真运行中…" : "运行仿真"}
+          </button>
+        </header>
+
+        <section className="summary-strip" aria-label="关键结果">
+          <article><span>首次 PvP</span><strong>{fmtTime(metrics.firstPvpHour)}</strong><small>目标 {applied.targets.firstPvpHours[0]}–{applied.targets.firstPvpHours[1]} 小时</small></article>
+          <article><span>行动力使用率</span><strong>{percent(metrics.apUtilization)}</strong><small>溢出 {percent(metrics.apOverflowRate)}</small></article>
+          <article><span>活跃战线</span><strong>{metrics.activeFronts}</strong><small>{metrics.uniqueContestedTiles} 个争夺地格</small></article>
+          <article><span>中心争夺占比</span><strong>{percent(metrics.centerContestShare)}</strong><small>全部争夺事件</small></article>
+          <article><span>领先联盟</span><strong style={{ color: ALLIANCE_COLORS[leader.id - 1] }}>{leader.name}</strong><small>{leader.snapshotScore} 地图分</small></article>
+        </section>
+
+        <section id="analysis-workspace" className="analysis-workspace" data-testid="analysis-workspace">
+          {tab === "仿真总览" && (
+            <div className="overview-layout">
+              <section className="analysis-card strategy-card">
+                <header className="card-heading"><div><p>策略分析</p><h2>策略分布与实际表现</h2></div><span><span>中心地格争夺占比</span> <b>{percent(metrics.centerContestShare)}</b></span></header>
+                <div className="table-scroll"><table><thead><tr><th>策略</th><th>玩家</th><th>实际占比</th><th>AP 使用</th><th>总分</th><th>击杀</th><th>占领</th><th>中心参与</th></tr></thead><tbody>
+                  {metrics.strategyMetrics.map((row) => <tr key={row.strategy}><th>{STRATEGY_NAMES[row.strategy]}</th><td>{row.players}</td><td>{percent(row.players / result.players.length)}</td><td>{percent(row.apUtilization)}</td><td>{compact(row.score)}</td><td>{compact(row.kills)}</td><td>{row.occupations}</td><td>{percent(row.centerContestShare)}</td></tr>)}
+                </tbody></table></div>
+              </section>
+
+              <section className="analysis-card power-card">
+                <header className="card-heading"><div><p>人口模型</p><h2>四档战力分布</h2></div><span><span>联盟战力比</span> <b>{alliancePowerRatio.toFixed(2)}</b></span></header>
+                <div className="table-scroll"><table><thead><tr><th>档位</th><th>玩家数</th><th>实际占比</th><th>基础战力</th><th>主力编队</th></tr></thead><tbody>
+                  {tierRows.map((row) => <tr key={row.tier}><th>{TIER_NAMES[row.tier]}</th><td>{row.players}</td><td>{percent(row.share)}</td><td>{compact(row.basePower)}</td><td>{row.main}</td></tr>)}
+                </tbody></table></div>
+                <div className="model-facts"><span>1 / 2 / 3 / 3 主力编队</span><span>{Number((applied.population.basePower.super / applied.population.basePower.low).toFixed(1))}× 超高/低档基础战力</span></div>
+              </section>
+
+              <section className="analysis-card map-panel">
+                <header className="card-heading"><div><p>地图回放</p><h2>T+{snapshot.hour.toFixed(0)}h 地图状态</h2></div><span>{snapshot.activeBattles} 场交战 · {snapshot.contestedTiles} 个争夺地格</span></header>
+                <HexMapCanvasV2 map={MAP} snapshot={snapshot} />
+                <label className="timeline"><span>回放时间</span><output>T+{hour}h</output><input aria-label="回放时间" type="range" min="0" max={applied.battleHours} value={hour} onChange={(event) => setHour(Number(event.target.value))} /></label>
+                <div className="map-legend"><strong>地格图例</strong>{["普通", "资源晶体", "核心", "山地", "水域", "交战/队列"].map((name, index) => <span key={name}><i className={`legend l${index}`} />{name}</span>)}</div>
+              </section>
+
+              <section className="analysis-card mix-card">
+                <header className="card-heading"><div><p>中心策略分配</p><h2>活跃度与战力倾向</h2></div></header>
+                <div className="split-metrics"><div><h3>按活跃度</h3>{centerShareByActivity.map((row) => <p key={row.tier}><span>{ACTIVITY_NAMES[row.tier]}</span><b>{percent(row.share)}</b></p>)}</div><div><h3>按战力档</h3>{centerShareByPower.map((row) => <p key={row.tier}><span>{TIER_NAMES[row.tier]}</span><b>{percent(row.share)}</b></p>)}</div></div>
+              </section>
+            </div>
+          )}
+
+          {tab === "行动力与占领" && (
+            <div className="content-grid">
+              <article className="result-card"><span>总体 AP 使用率</span><strong>{percent(metrics.apUtilization)}</strong><small>恢复溢出 {percent(metrics.apOverflowRate)}</small></article>
+              <article className="result-card"><span>首次 PvP</span><strong>{fmtTime(metrics.firstPvpHour)}</strong><small>状态：{metrics.firstPvpStatus === "target" ? "命中目标" : metrics.firstPvpStatus === "early" ? "早于目标" : "晚于目标"}</small></article>
+              <article className="result-card"><span>已应用占领倍率</span><strong data-testid="applied-pace-multiplier">{applied.occupation.paceMultiplier}×</strong><small>仅运行仿真后更新</small></article>
+              <article className="result-card"><span>争夺集中度</span><strong>{metrics.contestConcentration.toFixed(3)}</strong><small>{metrics.uniqueContestedTiles} 个争夺地格</small></article>
+              <section className="analysis-card wide-card"><header className="card-heading"><div><p>玩家行为结果</p><h2>各活跃度行动力利用率</h2></div></header><div className="activity-bars">{metrics.activityUtilization.map((row) => <div key={row.tier}><span>{ACTIVITY_NAMES[row.tier]}<small>{row.players} 人</small></span><i><b style={{ width: percent(row.utilization) }} /></i><strong>{percent(row.utilization)}</strong></div>)}</div></section>
+              <section className="analysis-card wide-card formula-card"><h2>占领时间公式</h2><code>(基础时长 + max(0, 基地距离 − {applied.occupation.safeDistance}) × {applied.occupation.secondsPerExcessHex}s) × {applied.occupation.paceMultiplier}</code></section>
+            </div>
+          )}
+
+          {tab === "战斗与士气" && (
+            <div className="content-grid">
+              <section className="analysis-card formula-card"><p>当前公式</p><h2>士气伤害系数</h2><code>{applied.morale.coefficientIntercept.toFixed(4)} + {applied.morale.coefficientSlope.toFixed(4)} × 士气/100</code><div className="anchor-grid">{[20, 100, 150].map((value) => <span key={value}>士气 {value}<b>{percent(moraleMultiplier(value, applied.morale))}</b></span>)}</div></section>
+              <section className="analysis-card matrix-card"><header className="card-heading"><div><p>进攻士气 100 / 防守士气 150</p><h2>战力档对战胜率</h2></div></header><div className="table-scroll"><table><thead><tr><th>进 / 防</th>{TIERS.map((tier) => <th key={tier}>{TIER_NAMES[tier]}</th>)}</tr></thead><tbody>{TIERS.map((attacker) => <tr key={attacker}><th>{TIER_NAMES[attacker]}</th>{TIERS.map((defender) => <td key={defender}>{percent(chance(attacker, defender))}</td>)}</tr>)}</tbody></table></div></section>
+              <section className="analysis-card wide-card fact-row"><span>单编队兵力 <b>{compact(applied.combat.troopSize)}</b></span><span>结算间隔 <b>{applied.combat.battleIntervalSeconds} 秒</b></span><span>每点战功击杀 <b>{compact(applied.scoring.killsPerPoint)}</b></span><span>本局 PvP <b>{metrics.pvpEvents} 场</b></span></section>
+            </div>
+          )}
+
+          {tab === "任务与奖励" && (
+            <section className="analysis-card task-results"><header className="card-heading"><div><p>使用已应用参数计算</p><h2>任务达成与奖励结果</h2></div><span>奖励倍率 {applied.rewards.multiplier}×</span></header><div className="table-scroll"><table><thead><tr><th>任务</th><th>积分阈值</th><th>奖励价值</th><th>实际达成率</th><th>目标覆盖率</th><th>边际价值/分</th></tr></thead><tbody>{applied.tasks.thresholds.map((threshold, index) => <tr key={index}><th>任务 {index + 1}</th><td>{threshold}</td><td>{applied.rewards.taskValues[index]}</td><td><span className="coverage-bar"><i style={{ width: percent(metrics.taskCoverage[index]) }} /></span>{percent(metrics.taskCoverage[index])}</td><td>{percent(applied.tasks.targetCoverage[index])}</td><td>{metrics.rewardMarginalValue[index].toFixed(3)}</td></tr>)}</tbody></table></div><div className="reward-distribution">{["前段", "中段", "高段", "顶段"].map((label, index) => <span key={label} style={{ flex: applied.rewards.tierShares[index] }}>{label} {applied.rewards.tierShares[index]}%</span>)}</div></section>
+          )}
+
+          {tab === "玩家与联盟排名" && (
+            <div className="ranking-layout"><section className="alliance-ranking">{sortedAlliances.map((alliance) => <article key={alliance.id} style={{ borderTopColor: ALLIANCE_COLORS[alliance.id - 1] }}><span>第 {alliance.rank} 名</span><h2>{alliance.name}</h2><strong>{alliance.snapshotScore}</strong><small>地图分 · {alliance.tileCount} 格 · 累计贡献 {alliance.contributionScore}</small></article>)}</section><section className="analysis-card player-ranking"><header className="card-heading"><div><p>当前单局</p><h2>玩家结果排名</h2></div></header><div className="table-scroll"><table><thead><tr><th>#</th><th>玩家</th><th>联盟</th><th>战力</th><th>策略</th><th>AP 使用</th><th>击杀</th><th>占领</th><th>总分</th></tr></thead><tbody>{[...result.players].sort((left, right) => right.personalScore - left.personalScore).map((player, index) => <tr key={player.id}><td>{index + 1}</td><th>{player.id}<small>{TIER_NAMES[player.powerTier]}</small></th><td><i className="alliance-dot" style={{ background: ALLIANCE_COLORS[player.allianceId - 1] }} />{player.allianceId}</td><td>{compact(player.power)}</td><td>{STRATEGY_NAMES[player.behaviorStrategy]}</td><td>{percent(player.apSpent / Math.max(1, player.apSupply))}</td><td>{compact(player.kills)}</td><td>{player.occupations}</td><td><b>{player.personalScore}</b></td></tr>)}</tbody></table></div></section></div>
+          )}
+
+          {tab === "批量实验" && (
+            <section className="analysis-card batch-results-panel"><header className="card-heading"><div><p>基于当前已应用参数 · {applied.batchRuns} 局</p><h2>批量实验结果</h2></div><button type="button" className="secondary-button" disabled={batchRunning} onClick={runBatch}>{batchRunning ? "批量实验运行中…" : `运行 ${applied.batchRuns} 局实验`}</button></header>{batch ? <div className="batch-summary"><article><span>PvP 中位数</span><strong>{fmtTime(batch.firstPvpMedian)}</strong></article><article><span>目标命中率</span><strong>{percent(batch.firstPvpTargetRate)}</strong></article><article><span>统治风险</span><strong>{percent(batch.dominanceRisk)}</strong></article></div> : <p className="empty-state">尚未运行批量实验。运行后将在此显示跨随机种子的稳定性结果。</p>}</section>
+          )}
+        </section>
+      </section>
+    </main>
+  );
 }
