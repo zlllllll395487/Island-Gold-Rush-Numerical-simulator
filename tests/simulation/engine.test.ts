@@ -74,7 +74,7 @@ describe("deterministic match simulation", () => {
       return centerDirected.length / dispatches.length;
     };
 
-    expect(strategyCounts).toEqual({ centerRush: 135, supportExpand: 105, multiFront: 60 });
+    expect(strategyCounts).toEqual({ centerRush: 135, supportExpand: 75, multiFront: 90 });
     expect(centerDirectedShare("centerRush")).toBeGreaterThan(centerDirectedShare("multiFront"));
   }, 15000);
 });

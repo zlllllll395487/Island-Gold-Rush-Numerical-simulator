@@ -24,7 +24,7 @@ export const DEFAULT_CONFIG: SimulationConfig = {
     ],
   },
   strategy: {
-    shares: { centerRush: 0.45, supportExpand: 0.35, multiFront: 0.2 },
+    shares: { centerRush: 0.45, supportExpand: 0.25, multiFront: 0.3 },
     activityWeight: 0.55,
     powerWeight: 0.35,
     randomWeight: 0.1,

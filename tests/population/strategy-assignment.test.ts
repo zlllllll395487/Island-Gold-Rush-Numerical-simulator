@@ -48,15 +48,15 @@ function makeEqualMotivationPlayers(playersPerAlliance: number): Player[] {
 }
 
 describe("behavior strategy assignment", () => {
-  test("assigns the default 45/35/20 quota within every 100-player alliance", () => {
+  test("assigns the default 45/25/30 quota within every 100-player alliance", () => {
     const matched = buildMatchedPopulation(DEFAULT_CONFIG, 20260813);
     const assigned = assignBehaviorStrategies(matched.players, DEFAULT_CONFIG, createRng(20260813));
 
     for (const allianceId of [1, 2, 3] as const) {
       expect(countsByStrategy(assigned.filter((player) => player.allianceId === allianceId))).toEqual({
         centerRush: 45,
-        supportExpand: 35,
-        multiFront: 20,
+        supportExpand: 25,
+        multiFront: 30,
       });
     }
   });
@@ -68,8 +68,8 @@ describe("behavior strategy assignment", () => {
     for (const allianceId of [1, 2, 3] as const) {
       expect(countsByStrategy(assigned.filter((player) => player.allianceId === allianceId))).toEqual({
         centerRush: 3,
-        supportExpand: 3,
-        multiFront: 1,
+        supportExpand: 2,
+        multiFront: 2,
       });
     }
   });
@@ -85,8 +85,8 @@ describe("behavior strategy assignment", () => {
     for (const allianceId of [1, 2, 3] as const) {
       expect(countsByStrategy(differentSeed.filter((player) => player.allianceId === allianceId))).toEqual({
         centerRush: 45,
-        supportExpand: 35,
-        multiFront: 20,
+        supportExpand: 25,
+        multiFront: 30,
       });
     }
   });
