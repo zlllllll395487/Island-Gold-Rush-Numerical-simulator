@@ -21,11 +21,12 @@ describe("AP, connectivity, and occupation rules", () => {
     expect(targets.some((id) => map.neighborsById.get(id)!.some((neighbor) => map.byId.get(neighbor)?.configId === 20001 && map.byId.get(neighbor)?.camp === 1))).toBe(true);
   });
 
-  test("always calculates occupation penalty from the alliance base", () => {
+  test("calculates base-distance occupation penalty and applies the pace multiplier", () => {
     const map = loadCanonicalMap(rawMap);
     const base = map.byConfigId.get(10001)!.find((tile) => tile.camp === 1)!;
     const target = map.tiles.filter((tile) => tile.configId === 30001).sort((a, b) => cubeDistance(base, b) - cubeDistance(base, a))[0];
     const distance = cubeDistance(base, target);
-    expect(occupationSeconds(target, distance, DEFAULT_CONFIG)).toBe(60 + Math.max(0, distance - 5) * 30);
+    const baseFormulaSeconds = 60 + Math.max(0, distance - 5) * 30;
+    expect(occupationSeconds(target, distance, DEFAULT_CONFIG)).toBe(baseFormulaSeconds * DEFAULT_CONFIG.occupation.paceMultiplier);
   });
 });

@@ -16,5 +16,10 @@ describe("default scenario calibration", () => {
     expect(metrics.firstPvpHour).not.toBeNull();
     expect(metrics.firstPvpHour!).toBeGreaterThanOrEqual(3);
     expect(metrics.firstPvpHour!).toBeLessThanOrEqual(6);
+    expect(metrics.apUtilization).toBeGreaterThanOrEqual(0.4);
+    expect(metrics.apUtilization).toBeLessThanOrEqual(0.6);
+    expect(metrics.activeFronts).toBeGreaterThanOrEqual(3);
+    expect(metrics.uniqueContestedTiles).toBeGreaterThanOrEqual(8);
+    expect(metrics.contestConcentration).toBeLessThan(0.35);
   });
 });

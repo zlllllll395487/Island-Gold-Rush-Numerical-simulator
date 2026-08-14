@@ -14,6 +14,11 @@ describe("decision metrics", () => {
     expect(metrics.taskCoverage).toHaveLength(10);
     expect(metrics.taskCoverage.every((value, index) => index === 0 || value <= metrics.taskCoverage[index - 1])).toBe(true);
     expect(metrics.firstPvpStatus).toMatch(/early|target|late|none/);
+    expect(metrics.activityUtilization).toHaveLength(5);
+    expect(metrics.activityUtilization[0].utilization).toBeLessThan(metrics.activityUtilization[4].utilization);
+    expect(metrics.apOverflowRate).toBeGreaterThanOrEqual(0);
+    expect(metrics.rewardMarginalValue).toHaveLength(10);
+    expect(metrics.uniqueContestedTiles).toBeGreaterThan(0);
   });
 
   test("summarizes batch values with median and risk probabilities", () => {

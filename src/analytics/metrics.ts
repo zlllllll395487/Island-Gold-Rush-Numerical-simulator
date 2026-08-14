@@ -1,14 +1,26 @@
-import type { SimulationConfig } from "../domain/types";
+import type { ActivityTier, SimulationConfig } from "../domain/types";
 import type { SimulationResult } from "../simulation/engine";
+
+export interface ActivityUtilizationMetric {
+  tier: ActivityTier;
+  players: number;
+  utilization: number;
+}
 
 export interface MatchMetrics {
   firstPvpHour: number | null;
   firstPvpStatus: "early" | "target" | "late" | "none";
   dominance: number;
   apUtilization: number;
+  apOverflowRate: number;
+  activityUtilization: ActivityUtilizationMetric[];
   taskCoverage: number[];
+  rewardMarginalValue: number[];
   medianPersonalScore: number;
   pvpEvents: number;
+  activeFronts: number;
+  uniqueContestedTiles: number;
+  contestConcentration: number;
 }
 
 export interface BatchSummary {
@@ -19,9 +31,13 @@ export interface BatchSummary {
 
 function median(values: number[]): number | null {
   if (!values.length) return null;
-  const sorted = [...values].sort((a, b) => a - b);
+  const sorted = [...values].sort((left, right) => left - right);
   const middle = Math.floor(sorted.length / 2);
   return sorted.length % 2 ? sorted[middle] : (sorted[middle - 1] + sorted[middle]) / 2;
+}
+
+function utilization(spent: number, supply: number): number {
+  return supply > 0 ? Math.min(1, spent / supply) : 0;
 }
 
 export function calculateMatchMetrics(result: SimulationResult, config: SimulationConfig): MatchMetrics {
@@ -31,17 +47,46 @@ export function calculateMatchMetrics(result: SimulationResult, config: Simulati
   const finalScores = result.alliances.map((alliance) => alliance.snapshotScore);
   const totalSnapshot = finalScores.reduce((sum, value) => sum + value, 0);
   const dominance = totalSnapshot ? Math.max(...finalScores) / totalSnapshot : 0;
-  const totalActions = result.players.reduce((sum, player) => sum + player.actions, 0);
-  const theoreticalCommands = result.players.length * 30;
-  const personalScores = result.players.map((player) => player.personalScore).sort((a, b) => a - b);
+  const totalSpent = result.players.reduce((sum, player) => sum + player.apSpent, 0);
+  const totalSupply = result.players.reduce((sum, player) => sum + player.apSupply, 0);
+  const totalOverflow = result.players.reduce((sum, player) => sum + player.apOverflow, 0);
+  const personalScores = result.players.map((player) => player.personalScore).sort((left, right) => left - right);
+  const contestCounts = Object.values(result.contestedTileCounts);
+  const totalContests = contestCounts.reduce((sum, count) => sum + count, 0);
+  const contestConcentration = totalContests
+    ? contestCounts.reduce((sum, count) => sum + Math.pow(count / totalContests, 2), 0)
+    : 0;
+
+  const activityUtilization = config.activity.bands.map((band) => {
+    const players = result.players.filter((player) => player.activityTier === band.id);
+    return {
+      tier: band.id,
+      players: players.length,
+      utilization: utilization(
+        players.reduce((sum, player) => sum + player.apSpent, 0),
+        players.reduce((sum, player) => sum + player.apSupply, 0),
+      ),
+    };
+  });
+
   return {
     firstPvpHour: first,
     firstPvpStatus,
     dominance,
-    apUtilization: Math.min(1, totalActions / theoreticalCommands),
+    apUtilization: utilization(totalSpent, totalSupply),
+    apOverflowRate: utilization(totalOverflow, totalSupply),
+    activityUtilization,
     taskCoverage: config.tasks.thresholds.map((threshold) => result.players.filter((player) => player.personalScore >= threshold).length / result.players.length),
+    rewardMarginalValue: config.tasks.thresholds.map((threshold, index) => {
+      const previousThreshold = index === 0 ? 0 : config.tasks.thresholds[index - 1];
+      const previousValue = index === 0 ? 0 : config.rewards.taskValues[index - 1];
+      return (config.rewards.taskValues[index] - previousValue) / Math.max(1, threshold - previousThreshold);
+    }),
     medianPersonalScore: median(personalScores) ?? 0,
-    pvpEvents: result.snapshots.at(-1)?.pvpEvents ?? 0,
+    pvpEvents: result.timeline.filter((event) => event.type === "battle").length,
+    activeFronts: result.activeFrontIds.length,
+    uniqueContestedTiles: contestCounts.length,
+    contestConcentration,
   };
 }
 

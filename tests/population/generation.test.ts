@@ -25,4 +25,34 @@ describe("matched virtual population", () => {
       expect(new Set(alliance.members.map((player) => player.activityTier)).size).toBe(5);
     }
   });
+
+  test("uses the approved activity mix and gives every player six formations from 22 heroes", () => {
+    const { players } = buildMatchedPopulation(DEFAULT_CONFIG, 20260813);
+    const activityCounts = Object.fromEntries(
+      ["minimal", "casual", "normal", "active", "core"].map((tier) => [
+        tier,
+        players.filter((player) => player.activityTier === tier).length,
+      ]),
+    );
+
+    expect(activityCounts).toEqual({ minimal: 30, casual: 60, normal: 120, active: 60, core: 30 });
+    expect(players.every((player) => player.heroCount === 22)).toBe(true);
+    expect(players.every((player) => player.formationProfiles.length === 6)).toBe(true);
+  });
+
+  test("uses the approved 75/20/5 power population split", () => {
+    const { players } = buildMatchedPopulation(DEFAULT_CONFIG, 8);
+    expect(players.filter((player) => player.powerTier === "low")).toHaveLength(225);
+    expect(players.filter((player) => player.powerTier === "mid")).toHaveLength(60);
+    expect(players.filter((player) => player.powerTier === "high")).toHaveLength(15);
+  });
+
+  test("honors editable power-tier shares", () => {
+    const config = structuredClone(DEFAULT_CONFIG);
+    config.population.powerShares = { low: 0.6, mid: 0.3, high: 0.1 };
+    const { players } = buildMatchedPopulation(config, 11);
+    expect(players.filter((player) => player.powerTier === "low")).toHaveLength(180);
+    expect(players.filter((player) => player.powerTier === "mid")).toHaveLength(90);
+    expect(players.filter((player) => player.powerTier === "high")).toHaveLength(30);
+  });
 });

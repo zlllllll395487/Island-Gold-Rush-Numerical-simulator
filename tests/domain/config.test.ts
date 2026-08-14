@@ -15,9 +15,34 @@ describe("simulation configuration", () => {
       baseSeconds: { normal: 60, resource: 90, core: 120 },
       safeDistance: 5,
       secondsPerExcessHex: 30,
+      paceMultiplier: 30,
     });
     expect(DEFAULT_CONFIG.tasks.thresholds).toEqual([200, 290, 400, 520, 650, 780, 940, 1140, 1390, 1750]);
     expect(DEFAULT_CONFIG.matching.maxStrongestToWeakestRatio).toBe(1.25);
+    expect(DEFAULT_CONFIG.activity.bands).toEqual([
+      { id: "minimal", share: 0.1, usage: 0.1 },
+      { id: "casual", share: 0.2, usage: 0.3 },
+      { id: "normal", share: 0.4, usage: 0.5 },
+      { id: "active", share: 0.2, usage: 0.7 },
+      { id: "core", share: 0.1, usage: 0.9 },
+    ]);
+    expect(DEFAULT_CONFIG.morale).toEqual({
+      base: 150,
+      max: 150,
+      min: 20,
+      safeDistance: 5,
+      lossPerExcessHex: 2,
+      lossPerWin: 2,
+      formulaMode: "gdd",
+      coefficientIntercept: 7 / 13,
+      coefficientSlope: 4 / 13,
+    });
+    expect(DEFAULT_CONFIG.combat.troopSize).toBe(100_000);
+    expect(DEFAULT_CONFIG.combat.battleIntervalSeconds).toBe(10);
+    expect(DEFAULT_CONFIG.population.powerShares).toEqual({ low: 0.75, mid: 0.2, high: 0.05 });
+    expect(DEFAULT_CONFIG.population.basePower).toEqual({ low: 460_000, mid: 900_000, high: 1_600_000 });
+    expect(DEFAULT_CONFIG.population.powerSigma).toEqual({ low: 0.18, mid: 0.18, high: 0.22 });
+    expect(DEFAULT_CONFIG.population.weakFormationScale).toEqual({ low: 0.45, mid: 0.52, high: 0.58 });
   });
 
   test("accepts the approved default configuration", () => {
