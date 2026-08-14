@@ -3,7 +3,7 @@ import type { Player } from "./generate-players";
 import type { SeededRng } from "./rng";
 
 const STRATEGIES = ["centerRush", "supportExpand", "multiFront"] as const satisfies readonly BehaviorStrategy[];
-const POWER_TIER_SCORES = { low: 0, mid: 0.5, high: 1 } as const;
+const POWER_TIER_SCORES = { low: 0, mid: 0.35, high: 0.7, super: 1 } as const;
 
 function normalizedActivity(players: readonly Player[]): Map<string, number> {
   const propensities = players.map((player) => player.apUsagePropensity);

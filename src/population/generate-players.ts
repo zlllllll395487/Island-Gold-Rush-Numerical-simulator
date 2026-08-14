@@ -31,9 +31,30 @@ export interface Player {
 }
 
 const STRATEGIES: readonly PlayerStrategy[] = ["frontier", "value", "aggressive", "defensive"];
+const POWER_TIERS = ["low", "mid", "high", "super"] as const satisfies readonly PowerTier[];
+
+function allocatePowerTierCounts(
+  count: number,
+  shares: SimulationConfig["population"]["powerShares"],
+): Record<PowerTier, number> {
+  const shareTotal = POWER_TIERS.reduce((sum, tier) => sum + shares[tier], 0);
+  if (shareTotal <= 0) throw new Error("Power shares must contain a positive allocation");
+  const exactCounts = POWER_TIERS.map((tier) => ({ tier, exact: count * shares[tier] / shareTotal }));
+  const counts = Object.fromEntries(
+    exactCounts.map(({ tier, exact }) => [tier, Math.floor(exact)]),
+  ) as Record<PowerTier, number>;
+  const remaining = count - POWER_TIERS.reduce((sum, tier) => sum + counts[tier], 0);
+  exactCounts
+    .sort((left, right) =>
+      (right.exact % 1) - (left.exact % 1) || POWER_TIERS.indexOf(left.tier) - POWER_TIERS.indexOf(right.tier),
+    )
+    .slice(0, remaining)
+    .forEach(({ tier }) => { counts[tier] += 1; });
+  return counts;
+}
 
 function formationProfiles(tier: PowerTier, config: SimulationConfig): FormationProfile[] {
-  const mainCount = tier === "high" ? 3 : tier === "mid" ? 2 : 1;
+  const mainCount = config.population.mainFormationCounts[tier];
   const weakScale = config.population.weakFormationScale[tier];
   return Array.from({ length: 6 }, (_, slot) => ({
     slot,
@@ -43,11 +64,10 @@ function formationProfiles(tier: PowerTier, config: SimulationConfig): Formation
 
 export function generatePopulation(config: SimulationConfig, rng: SeededRng): Player[] {
   const count = config.playersPerAlliance * 3;
-  const powerSlots = (["low", "mid", "high"] as const).flatMap((tier) =>
-    Array.from({ length: Math.round(count * config.population.powerShares[tier]) }, () => tier),
+  const powerTierCounts = allocatePowerTierCounts(count, config.population.powerShares);
+  const powerSlots = POWER_TIERS.flatMap((tier) =>
+    Array.from({ length: powerTierCounts[tier] }, () => tier),
   );
-  while (powerSlots.length < count) powerSlots.push("low");
-  powerSlots.length = count;
   for (let index = powerSlots.length - 1; index > 0; index--) {
     const swap = Math.floor(rng.next() * (index + 1));
     [powerSlots[index], powerSlots[swap]] = [powerSlots[swap], powerSlots[index]];

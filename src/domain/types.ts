@@ -2,7 +2,7 @@ export type AllianceId = 0 | 1 | 2 | 3;
 export type ActiveAllianceId = 1 | 2 | 3;
 export type TileId = number;
 export type TileConfigId = 10001 | 20001 | 30001 | 30002 | 30003 | 40001 | 40002;
-export type PowerTier = "low" | "mid" | "high";
+export type PowerTier = "low" | "mid" | "high" | "super";
 export type ActivityTier = "minimal" | "casual" | "normal" | "active" | "core";
 
 export type BehaviorStrategy = "centerRush" | "supportExpand" | "multiFront";
@@ -54,7 +54,7 @@ export interface SimulationConfig {
   seed: number;
   battleHours: number;
   playersPerAlliance: number;
-  population: { powerShares: Record<PowerTier, number>; basePower: Record<PowerTier, number>; powerSigma: Record<PowerTier, number>; weakFormationScale: Record<PowerTier, number> };
+  population: { powerShares: Record<PowerTier, number>; basePower: Record<PowerTier, number>; powerSigma: Record<PowerTier, number>; mainFormationCounts: Record<PowerTier, number>; weakFormationScale: Record<PowerTier, number> };
   ap: { initial: number; cap: number; recoveryAmount: number; recoveryEveryHours: number; attackCost: number; garrisonCost: number };
   occupation: { baseSeconds: { normal: number; resource: number; core: number }; safeDistance: number; secondsPerExcessHex: number; paceMultiplier: number };
   matching: { maxStrongestToWeakestRatio: number };

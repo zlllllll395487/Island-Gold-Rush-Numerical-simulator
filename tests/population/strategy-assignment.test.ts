@@ -1,5 +1,5 @@
 import { DEFAULT_CONFIG } from "../../src/domain/defaults";
-import type { ActiveAllianceId } from "../../src/domain/types";
+import type { ActiveAllianceId, PowerTier } from "../../src/domain/types";
 import { assignBehaviorStrategies } from "../../src/population/assign-strategies";
 import type { Player } from "../../src/population/generate-players";
 import { buildMatchedPopulation } from "../../src/population/match-alliances";
@@ -43,6 +43,22 @@ function makeEqualMotivationPlayers(playersPerAlliance: number): Player[] {
       apSupply: 0,
       maxActiveFormations: 0,
       maxWinStreak: 0,
+    })),
+  );
+}
+
+function makePowerTierPlayers(): Player[] {
+  const powerByTier = { low: 460_000, mid: 1_000_000, high: 2_800_000, super: 6_900_000 } as const;
+  const tiers = Object.keys(powerByTier) as PowerTier[];
+  const basePlayers = makeEqualMotivationPlayers(4);
+  return ([1, 2, 3] as const).flatMap((allianceId) =>
+    tiers.map((powerTier, index) => ({
+      ...basePlayers[index],
+      id: `A${allianceId}-${powerTier}`,
+      name: `${powerTier} ${allianceId}`,
+      allianceId,
+      powerTier,
+      power: powerByTier[powerTier],
     })),
   );
 }
@@ -100,5 +116,19 @@ describe("behavior strategy assignment", () => {
       median(assigned.map((player) => player.apUsagePropensity)),
     );
     expect(median(centerPlayers.map((player) => player.power))).toBeGreaterThan(median(assigned.map((player) => player.power)));
+  });
+
+  test("ranks the super tier highest when center-rush motivation is otherwise equal", () => {
+    const config = structuredClone(DEFAULT_CONFIG);
+    config.strategy.shares = { centerRush: 0.25, supportExpand: 0.25, multiFront: 0.5 };
+    config.strategy.randomWeight = 0;
+    const assigned = assignBehaviorStrategies(makePowerTierPlayers(), config, createRng(27));
+
+    for (const allianceId of [1, 2, 3] as const) {
+      const centerPlayer = assigned.find(
+        (player) => player.allianceId === allianceId && player.behaviorStrategy === "centerRush",
+      );
+      expect(centerPlayer?.powerTier).toBe("super");
+    }
   });
 });

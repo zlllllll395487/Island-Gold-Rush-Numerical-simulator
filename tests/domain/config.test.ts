@@ -39,10 +39,13 @@ describe("simulation configuration", () => {
     });
     expect(DEFAULT_CONFIG.combat.troopSize).toBe(100_000);
     expect(DEFAULT_CONFIG.combat.battleIntervalSeconds).toBe(10);
-    expect(DEFAULT_CONFIG.population.powerShares).toEqual({ low: 0.75, mid: 0.2, high: 0.05 });
-    expect(DEFAULT_CONFIG.population.basePower).toEqual({ low: 460_000, mid: 900_000, high: 1_600_000 });
-    expect(DEFAULT_CONFIG.population.powerSigma).toEqual({ low: 0.18, mid: 0.18, high: 0.22 });
-    expect(DEFAULT_CONFIG.population.weakFormationScale).toEqual({ low: 0.45, mid: 0.52, high: 0.58 });
+    expect(DEFAULT_CONFIG.population.powerShares).toEqual({ low: 0.75, mid: 0.2, high: 0.04, super: 0.01 });
+    expect(Object.values(DEFAULT_CONFIG.population.powerShares).reduce((sum, share) => sum + share, 0)).toBe(1);
+    expect(DEFAULT_CONFIG.population.basePower).toEqual({ low: 460_000, mid: 1_000_000, high: 2_800_000, super: 6_900_000 });
+    expect(DEFAULT_CONFIG.population.basePower.super / DEFAULT_CONFIG.population.basePower.low).toBe(15);
+    expect(DEFAULT_CONFIG.population.powerSigma).toEqual({ low: 0.18, mid: 0.18, high: 0.22, super: 0.2 });
+    expect(DEFAULT_CONFIG.population.mainFormationCounts).toEqual({ low: 1, mid: 2, high: 3, super: 3 });
+    expect(DEFAULT_CONFIG.population.weakFormationScale).toEqual({ low: 0.45, mid: 0.52, high: 0.58, super: 0.6 });
   });
 
   test("accepts the approved default configuration", () => {
@@ -78,6 +81,16 @@ describe("simulation configuration", () => {
     };
 
     expect(() => parseSimulationConfig(invalid)).toThrow(/strategy shares must total 1/i);
+  });
+
+  test("rejects non-integer or out-of-range main formation counts", () => {
+    const fractional = structuredClone(DEFAULT_CONFIG);
+    Object.assign(fractional.population, { mainFormationCounts: { low: 1, mid: 2, high: 2.5, super: 3 } });
+    expect(() => parseSimulationConfig(fractional)).toThrow();
+
+    const tooMany = structuredClone(DEFAULT_CONFIG);
+    Object.assign(tooMany.population, { mainFormationCounts: { low: 1, mid: 2, high: 3, super: 7 } });
+    expect(() => parseSimulationConfig(tooMany)).toThrow();
   });
 
   test("rejects non-increasing task thresholds", () => {

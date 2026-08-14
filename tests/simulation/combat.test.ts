@@ -45,4 +45,17 @@ describe("macro troop duel", () => {
     expect(strongWins).toBeGreaterThan(lowMoraleWins);
     expect(strongWins).toBeGreaterThan(240);
   });
+
+  test("gives a super player over 95% win probability against low power with equal troops and morale", () => {
+    const result = resolveDuel(
+      { basePower: DEFAULT_CONFIG.population.basePower.super, troops: 100_000, morale: 150 },
+      { basePower: DEFAULT_CONFIG.population.basePower.low, troops: 100_000, morale: 150 },
+      DEFAULT_CONFIG.combat,
+      DEFAULT_CONFIG.morale,
+      createRng(1),
+    );
+
+    expect(DEFAULT_CONFIG.population.basePower.super / DEFAULT_CONFIG.population.basePower.low).toBe(15);
+    expect(result.attackerWinProbability).toBeGreaterThan(0.95);
+  });
 });
