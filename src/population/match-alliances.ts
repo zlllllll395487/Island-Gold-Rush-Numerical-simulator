@@ -1,4 +1,5 @@
 import type { ActiveAllianceId, SimulationConfig } from "../domain/types";
+import { assignBehaviorStrategies } from "./assign-strategies";
 import { generatePopulation, type Player } from "./generate-players";
 import { createRng } from "./rng";
 
@@ -32,5 +33,6 @@ export function buildMatchedPopulation(config: SimulationConfig, seed: number): 
   if (Math.max(...powers) / Math.min(...powers) > config.matching.maxStrongestToWeakestRatio) {
     throw new Error("Unable to create alliances inside the configured matching boundary");
   }
+  assignBehaviorStrategies(players, config, createRng(seed));
   return { players: players.slice().sort((a, b) => a.id.localeCompare(b.id)), alliances };
 }
