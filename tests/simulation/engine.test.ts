@@ -1,6 +1,7 @@
 import rawMap from "../../src/data/tilerush-map.json";
 import { DEFAULT_CONFIG } from "../../src/domain/defaults";
 import { cubeDistance } from "../../src/map/hex";
+import { connectedTerritory, initialOwners, legalTargets } from "../../src/map/connectivity";
 import { loadCanonicalMap } from "../../src/map/map-loader";
 import { buildMatchedPopulation } from "../../src/population/match-alliances";
 import { runSimulation } from "../../src/simulation/engine";
@@ -47,6 +48,37 @@ describe("deterministic match simulation", () => {
     const result = runSimulation({ map, config: DEFAULT_CONFIG, population: buildMatchedPopulation(DEFAULT_CONFIG, 45), seed: 45 });
     expect(result.snapshots.some((snapshot) => Object.keys(snapshot.tileStatus).length > 0)).toBe(true);
   });
+
+  test("dispatches only to the current legal frontier or a connected friendly defensive fight", () => {
+    const result = runSimulation({
+      map,
+      config: DEFAULT_CONFIG,
+      population: buildMatchedPopulation(DEFAULT_CONFIG, DEFAULT_CONFIG.seed),
+      seed: DEFAULT_CONFIG.seed,
+    });
+    const owners = initialOwners(map);
+    let dispatches = 0;
+    let illegalDispatches = 0;
+
+    for (const event of result.timeline) {
+      if (event.type === "capture") {
+        owners.set(event.tileId!, event.allianceId!);
+        continue;
+      }
+      if (event.type !== "dispatch") continue;
+      dispatches += 1;
+      const allianceId = event.allianceId!;
+      const tileId = event.tileId!;
+      const legalFrontier = legalTargets(map, owners, allianceId).includes(tileId);
+      const defensiveSupport = (event as typeof event & { defensiveSupport?: boolean }).defensiveSupport === true
+        && owners.get(tileId) === allianceId
+        && connectedTerritory(map, owners, allianceId).has(tileId);
+      if (!legalFrontier && !defensiveSupport) illegalDispatches += 1;
+    }
+
+    expect(dispatches).toBeGreaterThan(0);
+    expect(illegalDispatches).toBe(0);
+  }, 15000);
 
   test("routes the default strategy quotas toward their distinct objectives", () => {
     const result = runSimulation({

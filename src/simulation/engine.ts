@@ -1,6 +1,6 @@
 import type { ActiveAllianceId, AllianceId, MapTile, NormalizedMap, SimulationConfig, TileId } from "../domain/types";
 import { cubeDistance } from "../map/hex";
-import { initialOwners, legalTargets } from "../map/connectivity";
+import { connectedTerritory, initialOwners, legalTargets } from "../map/connectivity";
 import type { MatchedPopulation } from "../population/match-alliances";
 import type { Player } from "../population/generate-players";
 import { createRng } from "../population/rng";
@@ -59,6 +59,7 @@ export interface TimelineEvent {
   playerId?: string;
   troopsKilled?: number;
   winnerTroops?: number;
+  defensiveSupport?: boolean;
 }
 
 export interface AllianceResult {
@@ -226,6 +227,7 @@ export function runSimulation({ map, config, population, seed }: SimulationInput
     supportQueueGap: config.fronts.supportQueueGap,
   };
   const legalCache = new Map<ActiveAllianceId, TileId[]>();
+  const connectedCache = new Map<ActiveAllianceId, Set<TileId>>();
   const contestedTileCounts = new Map<TileId, number>();
   const activeFrontIds = new Set<string>();
   const events: SimulationEvent[] = [];
@@ -250,12 +252,25 @@ export function runSimulation({ map, config, population, seed }: SimulationInput
     return targets;
   };
 
+  const connectedFor = (allianceId: ActiveAllianceId) => {
+    const cached = connectedCache.get(allianceId);
+    if (cached) return cached;
+    const connected = connectedTerritory(map, owners, allianceId);
+    connectedCache.set(allianceId, connected);
+    return connected;
+  };
+
   const candidatesFor = (runtime: RuntimePlayer): TargetCandidate[] => {
     const allianceId = runtime.player.allianceId;
     const ids = new Set<TileId>(legalFor(allianceId));
+    const connected = connectedFor(allianceId);
     for (const tileId of activeTileIds) {
       const state = states.get(tileId)!;
-      if (state.defenseQueue.length > 0 && state.attackQueue.length > 0) ids.add(tileId);
+      const friendlyDefensiveFight = state.ownerCamp === allianceId
+        && connected.has(tileId)
+        && state.defenseQueue.length > 0
+        && state.attackQueue.length > 0;
+      if (friendlyDefensiveFight) ids.add(tileId);
     }
     return [...ids].map((tileId) => {
       const state = states.get(tileId)!;
@@ -317,6 +332,7 @@ export function runSimulation({ map, config, population, seed }: SimulationInput
       entryOrder: troopSequence,
     };
     const wasFighting = target.defenseQueue.length > 0 && target.attackQueue.length > 0;
+    const defensiveSupport = wasFighting && target.ownerCamp === player.allianceId;
     if (target.defenseQueue.length === 0 && target.attackQueue.length === 0 && target.defenseCamp !== troop.allianceId) {
       target.defenseCamp = troop.allianceId;
       target.defenseQueue.push(troop);
@@ -333,7 +349,7 @@ export function runSimulation({ map, config, population, seed }: SimulationInput
     player.actions += 1;
     player.apSpent += config.ap.attackCost * 3;
     player.maxActiveFormations = Math.max(player.maxActiveFormations, runtime.activeSlots.size);
-    timeline.push({ second, type: "dispatch", tileId: targetId, allianceId: player.allianceId, playerId: player.id });
+    timeline.push({ second, type: "dispatch", tileId: targetId, allianceId: player.allianceId, playerId: player.id, defensiveSupport });
   };
 
   for (let second = 10; second <= totalSeconds; second += 10) {
@@ -409,6 +425,7 @@ export function runSimulation({ map, config, population, seed }: SimulationInput
       if (!update.captured) continue;
       owners.set(state.tileId, state.ownerCamp);
       legalCache.clear();
+      connectedCache.clear();
       const points = tileValue(tile.configId, config);
       const player = runtimeByPlayer.get(occupier.playerId)!.player;
       player.occupationScore += points;
