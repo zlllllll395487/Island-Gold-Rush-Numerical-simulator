@@ -1,6 +1,7 @@
 import type { AllianceId } from "../domain/types";
 import type { SeededRng } from "../population/rng";
 import type { PlayerStrategy } from "../population/generate-players";
+import { candidatesInFront } from "./fronts";
 
 export interface TargetCandidate {
   tileId: number;
@@ -8,12 +9,21 @@ export interface TargetCandidate {
   ownerCamp: AllianceId;
   tileType: "normal" | "resource" | "core";
   distance: number;
+  centerDistance?: number;
   fighting: boolean;
   ownTroopPresent: boolean;
   friendlyQueue: number;
   enemyQueue: number;
   congestion: number;
   recentContests: number;
+}
+
+export interface StrategyTargetingConfig {
+  centerWeight: number;
+  resourceWeight: number;
+  normalWeight: number;
+  congestionAvoidance: number;
+  supportQueueGap: number;
 }
 
 export interface FrontTargetingConfig {
@@ -68,4 +78,115 @@ export function chooseTarget(
   const neutral = expansion.filter((candidate) => candidate.ownerCamp === 0);
   const pool = neutral.length > 0 ? neutral : expansion;
   return weightedChoice(pool, pool.map((candidate) => score(candidate, strategy, config)), rng);
+}
+function legalCandidates(candidates: readonly TargetCandidate[]): TargetCandidate[] {
+  return candidates.filter((candidate) => !candidate.ownTroopPresent);
+}
+
+function motivation(candidate: TargetCandidate, config: StrategyTargetingConfig): number {
+  if (candidate.tileType === "core") return config.centerWeight;
+  if (candidate.tileType === "resource") return config.resourceWeight;
+  return config.normalWeight;
+}
+
+function strategyScore(candidate: TargetCandidate, config: StrategyTargetingConfig): number {
+  return motivation(candidate, config)
+    - candidate.distance * 0.45
+    - candidate.congestion * config.congestionAvoidance
+    - candidate.recentContests * 2.5;
+}
+
+function chooseWeightedStrategyTarget(
+  candidates: readonly TargetCandidate[],
+  config: StrategyTargetingConfig,
+  rng: SeededRng,
+): number | null {
+  if (candidates.length === 0) return null;
+  return weightedChoice(candidates, candidates.map((candidate) => strategyScore(candidate, config)), rng);
+}
+
+function distanceToCore(candidate: TargetCandidate): number {
+  return candidate.centerDistance ?? candidate.distance;
+}
+
+function deterministicCenterChoice(
+  candidates: readonly TargetCandidate[],
+  config: StrategyTargetingConfig,
+  rng: SeededRng,
+): number | null {
+  if (candidates.length === 0) return null;
+  const core = candidates.filter((candidate) => candidate.tileType === "core");
+  const centerPool = core.length > 0
+    ? core
+    : candidates.filter((candidate) => distanceToCore(candidate) === Math.min(...candidates.map(distanceToCore)));
+  const strongestMotivation = Math.max(...centerPool.map((candidate) => motivation(candidate, config)));
+  const motivated = centerPool.filter((candidate) => motivation(candidate, config) === strongestMotivation);
+  const lowestCongestion = Math.min(...motivated.map((candidate) => candidate.congestion));
+  const uncongested = motivated.filter((candidate) => candidate.congestion === lowestCongestion);
+  const fewestContests = Math.min(...uncongested.map((candidate) => candidate.recentContests));
+  return chooseWeightedStrategyTarget(uncongested.filter((candidate) => candidate.recentContests === fewestContests), config, rng);
+}
+
+export function chooseCenterRushTarget(
+  candidates: readonly TargetCandidate[],
+  config: StrategyTargetingConfig,
+  rng: SeededRng,
+): number | null {
+  return deterministicCenterChoice(legalCandidates(candidates), config, rng);
+}
+
+export function chooseSupportExpandTarget(
+  candidates: readonly TargetCandidate[],
+  config: StrategyTargetingConfig,
+  rng: SeededRng,
+): number | null {
+  const legal = legalCandidates(candidates);
+  const fights = legal.filter((candidate) => candidate.fighting);
+  if (fights.length > 0) {
+    const supportable = fights.filter((candidate) => candidate.friendlyQueue - candidate.enemyQueue < config.supportQueueGap);
+    if (supportable.length === 0) return null;
+    const smallestDifference = Math.min(...supportable.map((candidate) => candidate.friendlyQueue - candidate.enemyQueue));
+    return chooseWeightedStrategyTarget(
+      supportable.filter((candidate) => candidate.friendlyQueue - candidate.enemyQueue === smallestDifference),
+      config,
+      rng,
+    );
+  }
+
+  const expansion = legal.filter((candidate) => !candidate.fighting);
+  const neutral = expansion.filter((candidate) => candidate.ownerCamp === 0);
+  return chooseWeightedStrategyTarget(neutral.length > 0 ? neutral : expansion, config, rng);
+}
+
+function chooseMultiFrontFromPool(
+  candidates: readonly TargetCandidate[],
+  config: StrategyTargetingConfig,
+  rng: SeededRng,
+): number | null {
+  const fights = candidates.filter((candidate) => candidate.fighting);
+  if (fights.length > 0) {
+    const supportable = fights.filter((candidate) => candidate.friendlyQueue - candidate.enemyQueue < config.supportQueueGap);
+    if (supportable.length === 0) return null;
+    const smallestDifference = Math.min(...supportable.map((candidate) => candidate.friendlyQueue - candidate.enemyQueue));
+    return chooseWeightedStrategyTarget(
+      supportable.filter((candidate) => candidate.friendlyQueue - candidate.enemyQueue === smallestDifference),
+      config,
+      rng,
+    );
+  }
+  const neutral = candidates.filter((candidate) => candidate.ownerCamp === 0);
+  return chooseWeightedStrategyTarget(neutral.length > 0 ? neutral : candidates, config, rng);
+}
+
+export function chooseMultiFrontTarget(
+  candidates: readonly TargetCandidate[],
+  primaryFrontId: string,
+  config: StrategyTargetingConfig,
+  rng: SeededRng,
+): number | null {
+  const legal = legalCandidates(candidates);
+  const local = candidatesInFront(legal, primaryFrontId);
+  const localTarget = chooseMultiFrontFromPool(local, config, rng);
+  if (localTarget !== null) return localTarget;
+  return chooseMultiFrontFromPool(legal.filter((candidate) => candidate.frontId !== primaryFrontId), config, rng);
 }

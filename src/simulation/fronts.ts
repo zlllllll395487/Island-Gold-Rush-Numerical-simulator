@@ -1,6 +1,16 @@
 import type { ActiveAllianceId, MapTile, NormalizedMap } from "../domain/types";
 import type { Player } from "../population/generate-players";
 
+export interface FrontCandidate {
+  frontId: string;
+}
+
+export type TargetCandidate = FrontCandidate & { tileId: number };
+
+export function candidatesInFront<T extends FrontCandidate>(candidates: readonly T[], frontId: string): T[] {
+  return candidates.filter((candidate) => candidate.frontId === frontId);
+}
+
 export interface AllianceFront {
   id: string;
   allianceId: ActiveAllianceId;
