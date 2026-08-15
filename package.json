@@ -1,7 +1,7 @@
 {
-  "name": "site-creator-vinext-starter",
-  "version": "0.1.0",
-  "private": true,
+  "name": "island-gold-rush-numerical-simulator",
+  "version": "1.0.0",
+  "private": false,
   "engines": {
     "node": ">=22.13.0"
   },
@@ -11,11 +11,9 @@
     "start": "vinext start",
     "test": "vitest run",
     "test:watch": "vitest",
-    "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",
-    "db:generate": "drizzle-kit generate"
+    "lint": "eslint . --ignore-pattern dist --ignore-pattern .next"
   },
   "dependencies": {
-    "drizzle-orm": "0.45.2",
     "react": "19.2.6",
     "react-dom": "19.2.6",
     "recharts": "^3.10.1",
@@ -33,7 +31,6 @@
     "@types/react-dom": "19.2.3",
     "@vitejs/plugin-react": "6.0.2",
     "@vitejs/plugin-rsc": "0.5.26",
-    "drizzle-kit": "0.31.10",
     "eslint": "9.39.4",
     "eslint-plugin-jsx-a11y": "6.10.2",
     "eslint-plugin-react": "7.37.5",
@@ -49,5 +46,6 @@
     "vitest": "^4.1.10",
     "wrangler": "4.92.0"
   },
-  "type": "module"
+  "type": "module",
+  "description": "Interactive numerical simulator for a three-alliance hex-map strategy mode."
 }
