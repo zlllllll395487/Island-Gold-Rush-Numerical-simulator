@@ -1,5 +1,3 @@
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 import { vi } from "vitest";
@@ -12,7 +10,6 @@ import { PARAMETER_CATALOG, PARAMETER_GROUPS } from "../../src/components/parame
 import { DEFAULT_CONFIG } from "../../src/domain/defaults";
 import type { SimulationConfig } from "../../src/domain/types";
 
-const parameterPanelStyles = readFileSync(resolve(process.cwd(), "src/components/parameter-panel.css"), "utf8");
 
 const GROUP_NAMES = [
   "基础参数",
@@ -130,12 +127,10 @@ describe("parameter panel", () => {
     const taskRows = screen.getAllByTestId(/^task-row-/);
     expect(taskRows).toHaveLength(10);
     expect(taskRows[0]).toHaveClass("parameter-task-row");
-    expect(parameterPanelStyles).toMatch(
-      /\.parameter-panel \.parameter-task-row \{[^}]*display: grid;[^}]*grid-template-columns:/s,
-    );
-    expect(parameterPanelStyles).toMatch(
-      /@media \(max-width: 640px\)[\s\S]*\.parameter-panel \.parameter-task-row \{[^}]*grid-template-columns: minmax\(0, 1fr\)/,
-    );
+    for (const row of taskRows) {
+      expect(row.querySelectorAll(".parameter-control")).toHaveLength(3);
+    }
+    expect(container.querySelector("details, summary")).toBeNull();
   });
 
   test("shows the approved 45/25/30 strategy mix", () => {

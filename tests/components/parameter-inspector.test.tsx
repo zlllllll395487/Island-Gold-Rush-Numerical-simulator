@@ -75,4 +75,20 @@ describe("parameter chapter inspector", () => {
     expect(screen.getByLabelText("\u8d85\u9ad8\u6218\u529b\u666e\u901a\u7f16\u961f\u5f3a\u5ea6")).toBeInTheDocument();
     expect(screen.getByTestId("parameter-search-results")).toHaveTextContent(POPULATION);
   });
+
+  test("marks the parameter workspace as editorial without adding category chrome", () => {
+    render(
+      <ParameterPanel
+        draft={structuredClone(DEFAULT_CONFIG)}
+        validation={[]}
+        onChange={vi.fn()}
+        onReset={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByTestId("parameter-panel")).toHaveAttribute("data-variant", "editorial");
+    const nav = screen.getByTestId("parameter-category-nav");
+    expect(within(nav).getByRole("button", { name: new RegExp(BASIC) })).toHaveAttribute("aria-current", "page");
+    expect(document.querySelector("details, summary")).toBeNull();
+  });
 });

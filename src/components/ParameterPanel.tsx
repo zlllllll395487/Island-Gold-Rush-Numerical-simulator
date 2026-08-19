@@ -228,7 +228,7 @@ export function ParameterPanel({ draft, validation, onChange, onReset }: Paramet
   }, [activeGroup, normalizedQuery]);
 
   return (
-    <section className="parameter-panel" data-layout="vertical" data-testid="parameter-panel">
+    <section className="parameter-panel" data-layout="vertical" data-variant="editorial" data-testid="parameter-panel">
       <header className="parameter-panel__header">
         <h2>参数调整</h2>
         <button type="button" onClick={onReset}>
