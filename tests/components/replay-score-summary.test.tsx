@@ -1,6 +1,7 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
-import { PlayerScoreLedger, ReplayScoreSummary } from "../../src/components/ReplayScoreSummary";
+import { buildScoreView, PlayerScoreLedger, ReplayScoreSummary } from "../../src/components/ReplayScoreSummary";
+import type { AllianceScorePoint } from "../../src/analytics/replay-analysis";
 import type { ReplaySnapshot, SimulationResult } from "../../src/simulation/engine";
 import type { Player } from "../../src/population/generate-players";
 
@@ -57,10 +58,46 @@ const result = {
   })),
 } as SimulationResult;
 
+describe("alliance score view transformations", () => {
+  const row = (total: number) => ({ battle: total, occupation: 0, total });
+  const series: AllianceScorePoint[] = [
+    { hour: 0, alliances: [row(60), row(60), row(60)] },
+    { hour: 1, alliances: [row(90), row(100), row(110)] },
+    { hour: 2, alliances: [row(120), row(140), row(160)] },
+  ];
+
+  test("reveals relative separation around the point mean", () => {
+    expect(buildScoreView(series, "relative")[1].values).toEqual([-10, 0, 10]);
+  });
+
+  test("preserves cumulative totals and derives interval gains", () => {
+    expect(buildScoreView(series, "cumulative")[1].values).toEqual([90, 100, 110]);
+    expect(buildScoreView(series, "gain")[2].values).toEqual([30, 40, 50]);
+    expect(buildScoreView(series.slice(0, 1), "gain")[0].values).toEqual([0, 0, 0]);
+  });
+});
+
 describe("lightweight score replay visuals", () => {
+  test("defaults to relative gap and switches among three synchronized views", () => {
+    const view = render(<ReplayScoreSummary result={result} snapshot={snapshots[1]} />);
+
+    expect(screen.getByRole("radio", { name: "相对均值差" })).toBeChecked();
+    expect(screen.getByRole("img", { name: "联盟相对均值差走势" })).toBeInTheDocument();
+    expect(screen.getByTestId("score-zero-baseline")).toBeInTheDocument();
+    expect(screen.getAllByTestId(/^score-end-label-/)).toHaveLength(3);
+
+    fireEvent.click(screen.getByRole("radio", { name: "累计积分" }));
+    expect(screen.getByRole("img", { name: "联盟累计积分走势" })).toBeInTheDocument();
+    expect(screen.queryByTestId("score-zero-baseline")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("radio", { name: "阶段增量" }));
+    expect(screen.getByRole("img", { name: "联盟阶段增量走势" })).toBeInTheDocument();
+    expect(screen.getByTestId("score-replay-hour")).toHaveTextContent("T+1h");
+    expect(view.container.querySelectorAll(".score-sparkline polyline")).toHaveLength(3);
+  });
   test("keeps alliance cumulative score and occupied value synchronized with the selected snapshot", () => {
     const view = render(<ReplayScoreSummary result={result} snapshot={snapshots[1]} />);
-    expect(screen.getByRole("img", { name: "联盟累计积分走势" })).toBeInTheDocument();
+    expect(screen.getByRole("img", { name: "联盟相对均值差走势" })).toBeInTheDocument();
     expect(screen.getByText("赤潮联邦")).toBeInTheDocument();
     expect(view.container.querySelector(".score-sparkline polyline")?.getAttribute("stroke")).toBe("#a55b56");
     expect(view.container.querySelectorAll(".score-chart-grid")).toHaveLength(4);

@@ -326,7 +326,7 @@ describe("simulation dashboard", () => {
   test("keeps lightweight score visuals synchronized and opens a selected player's ledger", () => {
     render(<SimulationDashboard />);
 
-    expect(screen.getByRole("img", { name: "联盟累计积分走势" })).toBeInTheDocument();
+    expect(screen.getByRole("img", { name: "联盟相对均值差走势" })).toBeInTheDocument();
     fireEvent.change(screen.getByRole("slider", { name: "回放时间" }), { target: { value: "0" } });
     expect(screen.getByTestId("score-replay-hour")).toHaveTextContent("T+0h");
 
