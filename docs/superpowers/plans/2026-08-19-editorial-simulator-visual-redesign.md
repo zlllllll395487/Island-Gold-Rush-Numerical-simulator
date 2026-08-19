@@ -1,4 +1,4 @@
-﻿# Editorial Simulator Visual Redesign Implementation Plan
+# Editorial Simulator Visual Redesign Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
@@ -742,8 +742,3 @@ git log -6 --oneline
 ```
 
 Expected: clean worktree and the Task 1-5 commits appear in order after the approved design commit.
-
-
-
-
-
