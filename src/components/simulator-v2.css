@@ -680,3 +680,194 @@ button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-v
   .mix-card { grid-template-columns: 1fr; }
   .mix-card > .score-replay-summary { border-top: 1px solid var(--border); border-left: 0; }
 }
+/* Readable editorial workspace */
+:root {
+  --body-size: 13px;
+  --body-weight: 500;
+  --label-size: 12px;
+  --label-weight: 550;
+  --heading-weight: 600;
+}
+
+body {
+  font-family: var(--sans);
+  font-size: var(--body-size);
+  font-weight: var(--body-weight);
+  line-height: 1.55;
+  text-rendering: optimizeLegibility;
+}
+
+button,
+input,
+select,
+table {
+  font-variant-numeric: tabular-nums;
+}
+
+h1,
+h2,
+h3,
+.product-brand h1,
+.decision-summary strong {
+  font-weight: var(--heading-weight);
+}
+
+.simulation-app {
+  grid-template-columns: clamp(390px, 29vw, 470px) minmax(0, 1fr);
+}
+
+.analysis-shell,
+.analysis-workspace {
+  min-width: 0;
+}
+
+.product-brand p,
+.analysis-header p,
+.draft-status,
+.parameter-sidebar .parameter-search span,
+.parameter-sidebar .parameter-control label,
+.parameter-sidebar .parameter-control output,
+.parameter-sidebar .parameter-total,
+.parameter-sidebar .parameter-empty {
+  font-size: var(--label-size);
+  font-weight: var(--body-weight);
+}
+
+.product-brand h1 { font-size: 19px; }
+.analysis-tabs button { font-size: 13px; font-weight: var(--label-weight); }
+.parameter-sidebar .parameter-panel__header h2 { font-size: 17px; font-weight: var(--heading-weight); }
+.parameter-sidebar .parameter-panel__header button,
+.parameter-sidebar .parameter-control input,
+.parameter-sidebar .parameter-control select {
+  min-height: 34px;
+  font-size: 12.5px;
+  font-weight: var(--body-weight);
+}
+.parameter-sidebar .parameter-control label { color: #5f625d; line-height: 1.45; }
+.parameter-sidebar .parameter-control output { color: #20231f; font-weight: 600; }
+.parameter-sidebar .parameter-validation,
+.parameter-sidebar .parameter-total p { font-size: 12px; }
+
+.card-heading p,
+.card-heading > span,
+.decision-summary__heading > span,
+.decision-summary__metrics p,
+.decision-summary__metrics small,
+.decision-diagnosis p,
+.decision-diagnosis ul,
+.model-facts,
+.timeline,
+.map-legend,
+.simulation-workload,
+.split-metrics h3,
+.split-metrics p,
+.result-card span,
+.result-card small,
+.activity-bars > div,
+.formula-card > p,
+.anchor-grid span,
+.fact-row,
+.alliance-ranking span,
+.alliance-ranking small,
+.player-score-ledger header p,
+.player-score-ledger header > span,
+.score-event-list > div,
+.batch-summary span,
+.empty-state {
+  font-size: 12px;
+  font-weight: var(--body-weight);
+}
+
+.card-heading h2 { font-size: 17px; font-weight: var(--heading-weight); }
+table { font-size: 12.5px; }
+thead th { font-size: 11.5px; font-weight: var(--label-weight); }
+tbody th { font-weight: 600; }
+td small,
+th small { font-size: 11px; font-weight: var(--body-weight); }
+.decision-summary__heading p,
+.card-heading p,
+.score-replay-title p { font-size: 11px; font-weight: 600; }
+.decision-summary__metrics p { font-size: 12px; }
+.decision-summary__metrics small { font-size: 11px; }
+.decision-diagnosis strong { font-size: 14px; }
+.map-legend,
+.simulation-workload { font-size: 10.5px; }
+
+.score-view-switch {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18px;
+  margin: 13px 0 4px;
+  padding: 0;
+  border: 0;
+}
+
+.score-view-switch label {
+  position: relative;
+  color: #777a75;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: var(--label-weight);
+}
+
+.score-view-switch input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.score-view-switch span {
+  display: inline-block;
+  padding: 2px 0 5px;
+  border-bottom: 1px solid transparent;
+}
+
+.score-view-switch input:checked + span {
+  color: #1b2522;
+  border-bottom-color: #159a88;
+}
+
+.score-view-switch input:focus-visible + span {
+  outline: 2px solid #468f86;
+  outline-offset: 3px;
+}
+
+.score-sparkline {
+  width: 100%;
+  height: auto;
+  aspect-ratio: 32 / 9;
+  margin: 8px 0 10px;
+  overflow: visible;
+}
+
+.score-zero-baseline {
+  stroke: #8f938d;
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+
+.score-end-connector {
+  stroke-width: .75;
+  vector-effect: non-scaling-stroke;
+}
+
+.score-end-label {
+  font-family: var(--sans);
+  font-size: 5.2px;
+  font-weight: 700;
+  paint-order: stroke;
+  stroke: var(--surface);
+  stroke-width: 1.8px;
+  stroke-linejoin: round;
+}
+
+.score-chart-axis-label { font-size: 6.4px; font-weight: 600; }
+.score-current-grid small { font-size: 11px; }
+.score-current-grid b { font-size: 20px; font-weight: 600; }
+
+@media (max-width: 900px) {
+  .simulation-app { grid-template-columns: 1fr; }
+  .parameter-sidebar { width: min(100%, 620px); }
+}

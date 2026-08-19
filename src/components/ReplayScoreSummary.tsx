@@ -106,7 +106,7 @@ export function ReplayScoreSummary({ result, snapshot }: { result: SimulationRes
           </label>
         ))}
       </fieldset>
-      <svg className="score-sparkline" viewBox="0 0 320 90" role="img" aria-label={copy.ariaLabel} preserveAspectRatio="none">
+      <svg className="score-sparkline" viewBox="0 0 320 90" role="img" aria-label={copy.ariaLabel} preserveAspectRatio="xMidYMid meet">
         {[10, 33, 57, 80].map((gridY) => (
           <line key={gridY} x1="8" y1={gridY} x2="258" y2={gridY} className="score-chart-grid" />
         ))}
