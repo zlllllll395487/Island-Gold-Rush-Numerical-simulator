@@ -15,6 +15,7 @@ import { HexMapCanvasV2 } from "./HexMapCanvasV2";
 import { DecisionSummary } from "./DecisionSummary";
 import { ParameterPanel, type ParameterValidationIssue } from "./ParameterPanel";
 import { PlayerScoreLedger, ReplayScoreSummary } from "./ReplayScoreSummary";
+import { SimulatorBrandMark } from "./SimulatorBrandMark";
 
 const MAP = loadCanonicalMap(rawMap);
 const TABS = ["仿真总览", "行动力与占领", "战斗与士气", "任务与奖励", "玩家与联盟排名", "批量实验"] as const;
@@ -191,7 +192,7 @@ export function SimulationDashboardV2() {
   };
 
   return (
-    <main className="simulation-app">
+    <main className="simulation-app editorial-workspace">
       <button
         ref={toggleRef}
         className="parameter-drawer-toggle"
@@ -221,8 +222,8 @@ export function SimulationDashboardV2() {
         aria-label="模拟参数与页面导航"
       >
         <header className="product-brand">
-          <span className="product-mark" aria-hidden="true">岛</span>
-          <div><h1>海岛夺金 数值模拟</h1><p>数值分析工作区</p></div>
+          <SimulatorBrandMark />
+          <div><strong>海岛夺金 · 数值模拟</strong><p>参数调整</p></div>
         </header>
         <div className="analysis-tabs" role="tablist" aria-label="分析页面">
           {TABS.map((name) => (

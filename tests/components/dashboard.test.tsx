@@ -30,12 +30,15 @@ describe("simulation dashboard", () => {
   test("uses the approved product language and one parameter control area", () => {
     const { container } = render(<SimulationDashboard />);
 
-    expect(screen.getByRole("heading", { level: 1, name: "海岛夺金 数值模拟" })).toBeInTheDocument();
+    expect(container.querySelector("main")).toHaveClass("editorial-workspace");
+    expect(screen.getByTestId("simulator-brand-mark")).toHaveAttribute("aria-hidden", "true");
+    expect(screen.getByRole("heading", { level: 1, name: "本局模拟结果" })).toBeInTheDocument();
+    expect(screen.getByText("当前参数已应用")).toBeInTheDocument();
     expect(screen.getAllByRole("heading", { level: 2, name: "参数调整" })).toHaveLength(1);
     expect(screen.getByTestId("parameter-panel")).toBeInTheDocument();
     expect(screen.getByTestId("analysis-workspace")).toBeInTheDocument();
     expect(container.querySelector(".decision-rail")).toBeNull();
-    expect(screen.queryByText(/数值指挥中心|决策信号|参数实验台|战场事件流|本局建议/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/数值指挥中心|决策信号|参数实验台|战场事件流|本局建议|从地图读懂|从差异判断|Simulation findings/i)).not.toBeInTheDocument();
 
     const tabs = screen.getAllByRole("tab");
     expect(tabs.map((tab) => tab.textContent)).toEqual(TABS);
@@ -293,7 +296,7 @@ describe("simulation dashboard", () => {
     fireEvent.click(screen.getByRole("tab", { name: "战斗与士气" }));
     await waitFor(() => expect(drawer).toHaveAttribute("inert"));
     expect(drawer).toHaveAttribute("aria-hidden", "true");
-    expect(workspace).toHaveFocus();
+    await waitFor(() => expect(workspace).toHaveFocus());
 
     fireEvent.click(screen.getByRole("button", { name: "展开参数调整" }));
     const closeToggle = screen.getByRole("button", { name: "收起参数调整" });

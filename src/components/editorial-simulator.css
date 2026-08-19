@@ -1,0 +1,51 @@
+@import url("https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Noto+Sans+SC:wght@400;500;600&family=Noto+Serif+SC:wght@500;600;700&display=swap");
+
+.editorial-workspace {
+  --paper: #f4f3ee;
+  --paper-raised: #f8f7f3;
+  --ink: #18211e;
+  --muted-ink: #707771;
+  --fine-rule: #d6d4cb;
+  --editorial-accent: #079c89;
+  --map-ink: #11242d;
+  --font-display: "Noto Serif SC", "Source Han Serif SC", "Songti SC", serif;
+  --font-ui: "Noto Sans SC", "Source Han Sans SC", "Microsoft YaHei", sans-serif;
+  --font-numeric: "IBM Plex Mono", "SFMono-Regular", Consolas, monospace;
+  --weight-display: 700;
+  --weight-label: 600;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-ui);
+  font-weight: 400;
+}
+
+.editorial-workspace .simulator-brand-mark {
+  width: 18px;
+  height: 20px;
+  flex: 0 0 auto;
+}
+
+.editorial-workspace .simulator-brand-mark path {
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.6;
+}
+
+.editorial-workspace .simulator-brand-mark circle {
+  fill: var(--editorial-accent);
+}
+
+.editorial-workspace h1,
+.editorial-workspace h2,
+.editorial-workspace h3 {
+  font-family: var(--font-display);
+  font-weight: var(--weight-display);
+}
+
+.editorial-workspace button,
+.editorial-workspace input,
+.editorial-workspace select {
+  font-family: var(--font-ui);
+}

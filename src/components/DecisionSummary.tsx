@@ -34,11 +34,6 @@ export function DecisionSummary({
       note: "未转化为有效行动",
     },
     {
-      label: "中心争夺强度",
-      value: percent(metrics.centerContestIntensity.score),
-      note: `${metrics.centerContestIntensity.battles} · ${metrics.centerContestIntensity.captures} 次易手`,
-    },
-    {
       label: "积分集中度",
       value: percent(metrics.scoreConcentrationTop10),
       note: `\u524d 10% \u73a9\u5bb6 \u00b7 \u6218\u529b\u76f8\u5173 ${metrics.powerScoreCorrelation?.toFixed(2) ?? "\u2014"}`,
@@ -49,10 +44,10 @@ export function DecisionSummary({
     <section className="decision-summary" data-testid="decision-summary" aria-label="关键决策指标">
       <header className="decision-summary__heading">
         <div>
-          <p>Simulation findings</p>
-          <h2>本局关键结论</h2>
+          <p>关键指标</p>
+          <h1>本局模拟结果</h1>
         </div>
-        <span>结果均由当前已应用参数推导</span>
+        <span>当前参数已应用</span>
       </header>
       <div className="decision-summary__metrics">
         {items.map((item, index) => (
