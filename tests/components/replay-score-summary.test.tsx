@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 import { buildScoreView, PlayerScoreLedger, ReplayScoreSummary } from "../../src/components/ReplayScoreSummary";
 import type { AllianceScorePoint } from "../../src/analytics/replay-analysis";
@@ -78,6 +78,16 @@ describe("alliance score view transformations", () => {
 });
 
 describe("lightweight score replay visuals", () => {
+  test("exposes the active score mode as a report figure state", () => {
+    render(<ReplayScoreSummary result={result} snapshot={snapshots[1]} />);
+    const figure = screen.getByRole("figure", { name: "联盟积分比较" });
+
+    expect(figure).toHaveAttribute("data-mode", "relative");
+    expect(within(figure).getByText("联盟积分比较")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("radio", { name: "阶段增量" }));
+    expect(figure).toHaveAttribute("data-mode", "gain");
+  });
   test("defaults to relative gap and switches among three synchronized views", () => {
     const view = render(<ReplayScoreSummary result={result} snapshot={snapshots[1]} />);
 

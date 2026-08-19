@@ -87,11 +87,11 @@ export function ReplayScoreSummary({ result, snapshot }: { result: SimulationRes
   const copy = SCORE_VIEW_COPY[mode];
 
   return (
-    <div className="score-replay-summary">
-      <div className="score-replay-title">
-        <div><p>积分与地图同步</p><h3>{copy.title}</h3></div>
+    <figure className="score-replay-summary" data-mode={mode} aria-label="联盟积分比较">
+      <figcaption className="score-replay-title">
+        <div><p>积分变化</p><h2>联盟积分比较</h2><small>{copy.title}</small></div>
         <span data-testid="score-replay-hour">T+{snapshot.hour.toFixed(0)}h</span>
-      </div>
+      </figcaption>
       <fieldset className="score-view-switch" aria-label="积分视图">
         {(["relative", "cumulative", "gain"] as const).map((viewMode) => (
           <label key={viewMode}>
@@ -170,7 +170,7 @@ export function ReplayScoreSummary({ result, snapshot }: { result: SimulationRes
           </div>
         ))}
       </div>
-    </div>
+    </figure>
   );
 }
 
