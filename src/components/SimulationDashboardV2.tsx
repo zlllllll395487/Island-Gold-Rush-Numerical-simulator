@@ -265,36 +265,52 @@ export function SimulationDashboardV2() {
         <DecisionSummary metrics={metrics} targetRange={applied.targets.firstPvpHours} />
 
         <section ref={workspaceRef} id="analysis-workspace" className="analysis-workspace" data-testid="analysis-workspace" tabIndex={-1}>
+
           {tab === "仿真总览" && (
-            <div className="overview-layout">
-              <section className="analysis-card strategy-card">
-                <header className="card-heading"><div><p>策略分析</p><h2>策略分布与实际表现</h2></div><span><span>中心地格争夺占比</span> <b>{percent(metrics.centerContestShare)}</b></span></header>
-                <div className="table-scroll"><table><thead><tr><th>策略</th><th>玩家</th><th>实际占比</th><th>AP 使用</th><th>总分</th><th>击杀</th><th>占领</th><th>中心参与</th></tr></thead><tbody>
-                  {metrics.strategyMetrics.map((row) => <tr key={row.strategy}><th>{STRATEGY_NAMES[row.strategy]}</th><td>{row.players}</td><td>{percent(row.players / result.players.length)}</td><td>{percent(row.apUtilization)}</td><td>{compact(row.score)}</td><td>{compact(row.kills)}</td><td>{row.occupations}</td><td>{percent(row.centerContestShare)}</td></tr>)}
-                </tbody></table></div>
+            <div className="overview-report" data-testid="overview-report">
+              <section className="overview-map-figure map-panel map-plate-primary">
+                <header className="figure-heading">
+                  <div><p>地图回放</p><h2>T+{snapshot.hour.toFixed(0)}h · 地图回放</h2></div>
+                  <span>{snapshot.activeBattles} 场交战 · {snapshot.contestedTiles} 个争夺地格</span>
+                </header>
+                <div className="map-figure-layout">
+                  <div className="map-stage">
+                    <HexMapCanvasV2 map={MAP} snapshot={snapshot} />
+                    <label className="timeline"><span>回放时间</span><output>T+{hour}h</output><input aria-label="回放时间" type="range" min="0" max={applied.battleHours} value={hour} onChange={(event) => setHour(Number(event.target.value))} /></label>
+                    {workload ? <p className="simulation-workload" data-testid="simulation-workload">{compact(workload.tenSecondTicks)} 个时间步 · {compact(workload.timelineEvents)} 条事件 · 出征 {compact(workload.dispatches)} · 战斗 {compact(workload.battles)} · 占领 {compact(workload.captures)} · 积分流水 {compact(workload.scoreEvents)} · {workload.elapsedMs.toFixed(1)}ms</p> : null}
+                    <div className="map-legend"><strong>地格图例</strong>{["普通", "资源晶体", "核心", "山地", "水域", "交战/队列"].map((name, index) => <span key={name}><i className={"legend l" + index} />{name}</span>)}</div>
+                  </div>
+                  <aside className="map-findings" aria-label="当前时刻指标">
+                    <h3>当前时刻</h3>
+                    <p><strong>{percent(metrics.centerContestIntensity.score)}</strong><span>中心争夺强度</span></p>
+                    <p><strong>{metrics.centerContestIntensity.battles}</strong><span>中心战斗</span></p>
+                    <p><strong>{metrics.centerContestIntensity.captures}</strong><span>中心易手</span></p>
+                  </aside>
+                </div>
               </section>
 
-              <section className="analysis-card power-card">
-                <header className="card-heading"><div><p>人口模型</p><h2>四档战力分布</h2></div><span><span>联盟战力比</span> <b>{alliancePowerRatio.toFixed(2)}</b></span></header>
-                <div className="table-scroll"><table><thead><tr><th>档位</th><th>玩家数</th><th>实际占比</th><th>基础战力</th><th>主力编队</th></tr></thead><tbody>
-                  {tierRows.map((row) => <tr key={row.tier}><th>{TIER_NAMES[row.tier]}</th><td>{row.players}</td><td>{percent(row.share)}</td><td>{compact(row.basePower)}</td><td>{row.main}</td></tr>)}
-                </tbody></table></div>
-                <div className="model-facts"><span data-testid="main-formation-summary">{mainFormationHeadline}</span><span>{Number((applied.population.basePower.super / applied.population.basePower.low).toFixed(1))}× 超高/低档基础战力</span></div>
-              </section>
+              <div className="overview-supporting-analysis">
+                <section className="analysis-card strategy-card">
+                  <header className="card-heading"><div><p>策略分析</p><h2>策略分布与实际表现</h2></div><span><span>中心地格争夺占比</span> <b>{percent(metrics.centerContestShare)}</b></span></header>
+                  <div className="table-scroll"><table><thead><tr><th>策略</th><th>玩家</th><th>实际占比</th><th>AP 使用</th><th>总分</th><th>击杀</th><th>占领</th><th>中心参与</th></tr></thead><tbody>
+                    {metrics.strategyMetrics.map((row) => <tr key={row.strategy}><th>{STRATEGY_NAMES[row.strategy]}</th><td>{row.players}</td><td>{percent(row.players / result.players.length)}</td><td>{percent(row.apUtilization)}</td><td>{compact(row.score)}</td><td>{compact(row.kills)}</td><td>{row.occupations}</td><td>{percent(row.centerContestShare)}</td></tr>)}
+                  </tbody></table></div>
+                </section>
 
-              <section className="analysis-card map-panel map-plate-primary">
-                <header className="card-heading"><div><p>地图回放</p><h2>T+{snapshot.hour.toFixed(0)}h 地图状态</h2></div><span>{snapshot.activeBattles} 场交战 · {snapshot.contestedTiles} 个争夺地格</span></header>
-                <HexMapCanvasV2 map={MAP} snapshot={snapshot} />
-                <label className="timeline"><span>回放时间</span><output>T+{hour}h</output><input aria-label="回放时间" type="range" min="0" max={applied.battleHours} value={hour} onChange={(event) => setHour(Number(event.target.value))} /></label>
-                {workload ? <p className="simulation-workload" data-testid="simulation-workload">{compact(workload.tenSecondTicks)} 个时间步 · {compact(workload.timelineEvents)} 条事件 · 出征 {compact(workload.dispatches)} · 战斗 {compact(workload.battles)} · 占领 {compact(workload.captures)} · 积分流水 {compact(workload.scoreEvents)} · {workload.elapsedMs.toFixed(1)}ms</p> : null}
-                <div className="map-legend"><strong>地格图例</strong>{["普通", "资源晶体", "核心", "山地", "水域", "交战/队列"].map((name, index) => <span key={name}><i className={`legend l${index}`} />{name}</span>)}</div>
-              </section>
+                <section className="analysis-card power-card">
+                  <header className="card-heading"><div><p>人口模型</p><h2>四档战力分布</h2></div><span><span>联盟战力比</span> <b>{alliancePowerRatio.toFixed(2)}</b></span></header>
+                  <div className="table-scroll"><table><thead><tr><th>档位</th><th>玩家数</th><th>实际占比</th><th>基础战力</th><th>主力编队</th></tr></thead><tbody>
+                    {tierRows.map((row) => <tr key={row.tier}><th>{TIER_NAMES[row.tier]}</th><td>{row.players}</td><td>{percent(row.share)}</td><td>{compact(row.basePower)}</td><td>{row.main}</td></tr>)}
+                  </tbody></table></div>
+                  <div className="model-facts"><span data-testid="main-formation-summary">{mainFormationHeadline}</span><span>{Number((applied.population.basePower.super / applied.population.basePower.low).toFixed(1))}× 超高/低档基础战力</span></div>
+                </section>
 
-              <section className="analysis-card mix-card">
-                <header className="card-heading"><div><p>中心策略分配</p><h2>活跃度与战力倾向</h2></div></header>
-                <div className="split-metrics"><div><h3>按活跃度</h3>{centerShareByActivity.map((row) => <p key={row.tier}><span>{ACTIVITY_NAMES[row.tier]}</span><b>{percent(row.share)}</b></p>)}</div><div><h3>按战力档</h3>{centerShareByPower.map((row) => <p key={row.tier}><span>{TIER_NAMES[row.tier]}</span><b>{percent(row.share)}</b></p>)}</div></div>
-                <ReplayScoreSummary result={result} snapshot={snapshot} />
-              </section>
+                <section className="analysis-card mix-card">
+                  <header className="card-heading"><div><p>中心策略分配</p><h2>活跃度与战力倾向</h2></div></header>
+                  <div className="split-metrics"><div><h3>按活跃度</h3>{centerShareByActivity.map((row) => <p key={row.tier}><span>{ACTIVITY_NAMES[row.tier]}</span><b>{percent(row.share)}</b></p>)}</div><div><h3>按战力档</h3>{centerShareByPower.map((row) => <p key={row.tier}><span>{TIER_NAMES[row.tier]}</span><b>{percent(row.share)}</b></p>)}</div></div>
+                  <ReplayScoreSummary result={result} snapshot={snapshot} />
+                </section>
+              </div>
             </div>
           )}
 

@@ -196,6 +196,18 @@ describe("simulation dashboard", () => {
     expect(within(firstTask).getByText("0.200")).toBeInTheDocument();
   }, 15000);
 
+  test("places the synchronized map before supporting overview analysis", () => {
+    const { container } = render(<SimulationDashboard />);
+    const overview = screen.getByTestId("overview-report");
+    const mapSection = within(overview).getByRole("heading", { name: /地图回放/ }).closest("section");
+    const strategySection = within(overview).getByRole("heading", { name: "策略分布与实际表现" }).closest("section");
+
+    expect(mapSection).toHaveClass("overview-map-figure");
+    expect(mapSection!.compareDocumentPosition(strategySection!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(container.querySelector(".overview-map-figure .map-canvas-wrap")).toBeInTheDocument();
+    expect(within(overview).getByRole("complementary", { name: "当前时刻指标" })).toBeInTheDocument();
+    expect(screen.queryByText(/共用同一实验上下文|唯一强视觉|读懂战局/)).not.toBeInTheDocument();
+  }, 15000);
   test("shows actual strategy analytics and the four-tier long-tail population summary", () => {
     render(<SimulationDashboard />);
 
