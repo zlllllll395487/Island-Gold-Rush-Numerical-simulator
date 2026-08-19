@@ -58,4 +58,16 @@ describe("GitHub Pages static deployment", () => {
     expect(workflow).toContain("actions/deploy-pages@v4");
     expect(workflow).toContain("npm run verify:pages");
   });
+  test("keeps generated Pages assets outside source linting", () => {
+    const command = process.platform === "win32" ? (process.env.ComSpec ?? "cmd.exe") : "npm";
+    const args = process.platform === "win32"
+      ? ["/d", "/s", "/c", "npm run lint"]
+      : ["run", "lint"];
+    const lint = spawnSync(command, args, {
+      cwd: projectRoot,
+      encoding: "utf8",
+    });
+
+    expect(lint.status, lint.stdout + lint.stderr).toBe(0);
+  }, 30_000);
 });
