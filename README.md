@@ -1,5 +1,7 @@
 # Island Gold Rush Numerical Simulator
 
+[Open the live simulator](https://zlllllll395487.github.io/Island-Gold-Rush-Numerical-simulator/)
+
 ![海岛夺金数值模拟界面](public/og-v3.png)
 
 一个可交互、可重复运行的网页数值模拟器，用于观察多人联盟玩法中，行动力、占领时长、战力分布、活跃度、士气、任务奖励与积分规则之间的联动影响。
@@ -50,3 +52,12 @@ npm run build
 ## 数据与隐私
 
 本仓库仅包含独立的通用模拟逻辑、示例地图和自动化测试，不包含真实玩家数据、线上配置、内部策划文档、部署凭证或其他项目代码。提交历史保留了模拟器主要功能的迭代过程。
+
+## GitHub Pages
+
+The public site is built from pages/ and deployed automatically from main by .github/workflows/deploy-pages.yml.
+
+Build and verify locally with:
+
+    npm run build:pages
+    npm run verify:pages

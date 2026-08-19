@@ -44,4 +44,18 @@ describe("GitHub Pages static deployment", () => {
     expect(verify.status, verify.stdout + verify.stderr).toBe(0);
     expect(verify.stdout).toContain("Pages build verified");
   });
+
+  test("uses the official GitHub Pages actions on pushes to main", () => {
+    const workflowPath = resolve(projectRoot, ".github", "workflows", "deploy-pages.yml");
+    expect(existsSync(workflowPath)).toBe(true);
+
+    const workflow = readFileSync(workflowPath, "utf8");
+    expect(workflow).toContain("branches: [main]");
+    expect(workflow).toContain("actions/configure-pages@v5");
+    expect(workflow).toContain("enablement: true");
+    expect(workflow).toContain("actions/upload-pages-artifact@v3");
+    expect(workflow).toContain("path: dist-pages");
+    expect(workflow).toContain("actions/deploy-pages@v4");
+    expect(workflow).toContain("npm run verify:pages");
+  });
 });
