@@ -50,6 +50,12 @@ function renderPanel(draft: SimulationConfig = structuredClone(DEFAULT_CONFIG)) 
   return { ...result, onChange, onReset };
 }
 
+function selectGroup(groupId: (typeof PARAMETER_GROUPS)[number]["id"]) {
+  const group = PARAMETER_GROUPS.find((entry) => entry.id === groupId)!;
+  const navigation = screen.getByRole("navigation", { name: /\u53c2\u6570\u7ae0\u8282/ });
+  fireEvent.click(within(navigation).getByRole("button", { name: new RegExp(group.label) }));
+}
+
 describe("parameter catalog", () => {
   test("covers each meaningful SimulationConfig leaf exactly once with practical unique labels", () => {
     const paths = PARAMETER_CATALOG.map((entry) => entry.path);
@@ -103,17 +109,24 @@ describe("parameter catalog", () => {
 });
 
 describe("parameter panel", () => {
-  test("renders all eleven groups in one vertical column with native controls and compact task rows", () => {
+  test("renders an eleven-chapter vertical inspector with native controls and compact task rows", () => {
     const { container } = renderPanel();
     const panel = screen.getByTestId("parameter-panel");
+    const navigation = screen.getByRole("navigation", { name: /\u53c2\u6570\u7ae0\u8282/ });
 
     expect(panel).toHaveAttribute("data-layout", "vertical");
+    expect(within(navigation).getAllByRole("button")).toHaveLength(11);
     for (const name of GROUP_NAMES) {
-      expect(screen.getByText(name)).toBeInTheDocument();
+      expect(within(navigation).getByRole("button", { name: new RegExp(name) })).toBeInTheDocument();
     }
-    expect(container.querySelector('input[type="range"]')).not.toBeNull();
     expect(container.querySelector('input[type="number"]')).not.toBeNull();
+
+    selectGroup("strategy");
+    expect(container.querySelector('input[type="range"]')).not.toBeNull();
+    selectGroup("morale");
     expect(container.querySelector("select")).not.toBeNull();
+
+    selectGroup("tasksRewards");
     const taskRows = screen.getAllByTestId(/^task-row-/);
     expect(taskRows).toHaveLength(10);
     expect(taskRows[0]).toHaveClass("parameter-task-row");
@@ -127,39 +140,44 @@ describe("parameter panel", () => {
 
   test("shows the approved 45/25/30 strategy mix", () => {
     renderPanel();
+    selectGroup("strategy");
 
     expect(screen.getByLabelText("中心争夺策略占比")).toHaveValue("45");
     expect(screen.getByLabelText("支援扩张策略占比")).toHaveValue("25");
     expect(screen.getByLabelText("多线推进策略占比")).toHaveValue("30");
   });
 
-  test("keeps every rendered default within native min, max, and step constraints", () => {
+  test("keeps every chapter default within native min, max, and step constraints", () => {
     renderPanel();
     const invalidDefaults: string[] = [];
 
-    for (const entry of PARAMETER_CATALOG) {
-      const control = screen.getByLabelText(entry.label);
-      if (!(control instanceof HTMLInputElement)) continue;
-      if (!control.validity.valid) {
-        invalidDefaults.push(
-          `${entry.path}: value=${control.value}, min=${control.min}, max=${control.max}, step=${control.step}`,
-        );
+    for (const group of PARAMETER_GROUPS) {
+      selectGroup(group.id);
+      for (const entry of PARAMETER_CATALOG.filter((candidate) => candidate.group === group.id)) {
+        const control = screen.getByLabelText(entry.label);
+        if (!(control instanceof HTMLInputElement)) continue;
+        if (!control.validity.valid) {
+          invalidDefaults.push(entry.path + ": value=" + control.value + ", min=" + control.min + ", max=" + control.max + ", step=" + control.step);
+        }
       }
     }
 
     expect(invalidDefaults).toEqual([]);
   });
 
-  test("re-entering every displayed default preserves the exact config leaf", () => {
+  test("re-entering every chapter default preserves the exact config leaf", () => {
     renderPanel();
     const driftedPaths: string[] = [];
 
-    for (const entry of PARAMETER_CATALOG) {
-      const control = screen.getByLabelText(entry.label) as HTMLInputElement | HTMLSelectElement;
-      const current = getParameterValue(DEFAULT_CONFIG, entry.path);
-      const normalized = normalizeParameterInput(entry, current, control.value);
-      if (normalized === null || !Object.is(normalized, current)) {
-        driftedPaths.push(entry.path);
+    for (const group of PARAMETER_GROUPS) {
+      selectGroup(group.id);
+      for (const entry of PARAMETER_CATALOG.filter((candidate) => candidate.group === group.id)) {
+        const control = screen.getByLabelText(entry.label) as HTMLInputElement | HTMLSelectElement;
+        const current = getParameterValue(DEFAULT_CONFIG, entry.path);
+        const normalized = normalizeParameterInput(entry, current, control.value);
+        if (normalized === null || !Object.is(normalized, current)) {
+          driftedPaths.push(entry.path);
+        }
       }
     }
 
@@ -225,6 +243,7 @@ describe("parameter panel", () => {
 
   test("clamps a scaled percentage in displayed units before applying its scale", () => {
     const { onChange } = renderPanel();
+    selectGroup("tasksRewards");
 
     fireEvent.change(screen.getByLabelText("任务 1 目标覆盖率"), { target: { value: "250" } });
 
@@ -282,6 +301,8 @@ describe("parameter panel", () => {
         onReset={vi.fn()}
       />,
     );
+
+    selectGroup("strategy");
 
     const alerts = screen.getAllByRole("alert");
     expect(alerts.some((alert) => within(alert).queryByText("行动力初始值不能超过上限"))).toBe(true);

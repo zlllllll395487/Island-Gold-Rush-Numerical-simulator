@@ -20,6 +20,12 @@ const TABS = [
   "批量实验",
 ] as const;
 
+function showParameter(label: string) {
+  fireEvent.change(screen.getByRole("searchbox", { name: /\u641c\u7d22\u53c2\u6570/ }), {
+    target: { value: label },
+  });
+  return screen.getByLabelText(label);
+}
 describe("simulation dashboard", () => {
   test("uses the approved product language and one parameter control area", () => {
     const { container } = render(<SimulationDashboard />);
@@ -37,12 +43,11 @@ describe("simulation dashboard", () => {
 
   test("keeps every configuration editor in ParameterPanel and results-only task and batch pages", () => {
     render(<SimulationDashboard />);
-    const panel = screen.getByTestId("parameter-panel");
     const workspace = screen.getByTestId("analysis-workspace");
 
-    expect(within(panel).getByLabelText("任务 1 积分阈值")).toBeInTheDocument();
-    expect(within(panel).getByLabelText("任务 1 奖励价值")).toBeInTheDocument();
-    expect(within(panel).getByLabelText("批量运行局数")).toBeInTheDocument();
+    expect(showParameter("任务 1 积分阈值")).toBeInTheDocument();
+    expect(showParameter("任务 1 奖励价值")).toBeInTheDocument();
+    expect(showParameter("批量运行局数")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("tab", { name: "任务与奖励" }));
     expect(within(workspace).getByText("任务达成与奖励结果")).toBeInTheDocument();
@@ -58,9 +63,9 @@ describe("simulation dashboard", () => {
     fireEvent.click(screen.getByRole("tab", { name: "行动力与占领" }));
 
     expect(screen.getByTestId("applied-pace-multiplier")).toHaveTextContent("30×");
-    fireEvent.change(screen.getByLabelText("占领节奏倍率"), { target: { value: "40" } });
+    fireEvent.change(showParameter("占领节奏倍率"), { target: { value: "40" } });
 
-    expect(screen.getByLabelText("占领节奏倍率")).toHaveValue("40");
+    expect(showParameter("占领节奏倍率")).toHaveValue("40");
     expect(screen.getByTestId("applied-pace-multiplier")).toHaveTextContent("30×");
     expect(screen.getByText("草稿待运行")).toBeInTheDocument();
 
@@ -69,12 +74,56 @@ describe("simulation dashboard", () => {
     expect(screen.getByText("结果已应用")).toBeInTheDocument();
   }, 15000);
 
+  test("normal Run applies a fresh seed while reproduce keeps the current seed", async () => {
+    vi.stubGlobal("crypto", {
+      getRandomValues(target: Uint32Array) {
+        target[0] = 314_159_265;
+        return target;
+      },
+    });
+    try {
+      render(<SimulationDashboard />);
+      const appliedSeed = screen.getByTestId("applied-seed");
+      expect(appliedSeed).toHaveTextContent("20260813");
+      fireEvent.change(showParameter("战斗时长（小时）"), { target: { value: "1" } });
+
+      fireEvent.click(screen.getByRole("button", { name: "运行仿真" }));
+      await waitFor(() => expect(appliedSeed).toHaveTextContent("314159265"));
+
+      const reproduce = screen.getByRole("button", { name: "按当前种子复现" });
+      fireEvent.click(reproduce);
+      await waitFor(() => expect(reproduce).toBeEnabled());
+      expect(appliedSeed).toHaveTextContent("314159265");
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  }, 15000);
+
+  test("shows workload derived from the completed simulation", async () => {
+    vi.stubGlobal("crypto", {
+      getRandomValues(target: Uint32Array) {
+        target[0] = 271_828_182;
+        return target;
+      },
+    });
+    try {
+      render(<SimulationDashboard />);
+      fireEvent.change(showParameter("战斗时长（小时）"), { target: { value: "1" } });
+      fireEvent.click(screen.getByRole("button", { name: "运行仿真" }));
+
+      await waitFor(() => expect(screen.getByTestId("simulation-workload")).toHaveTextContent("360 个时间步"));
+      expect(screen.getByTestId("simulation-workload")).toHaveTextContent(/出征 [\d,]+ · 战斗 [\d,]+ · 占领 [\d,]+ · 积分流水 [\d,]+ · [\d.]+ms/);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  }, 15000);
+
   test("keeps the main-formation headline applied until a valid rerun", async () => {
     render(<SimulationDashboard />);
     const summary = screen.getByTestId("main-formation-summary");
 
     expect(summary).toHaveTextContent("1 / 2 / 3 / 3 主力编队");
-    fireEvent.change(screen.getByLabelText("低战力主力编队数"), { target: { value: "4" } });
+    fireEvent.change(showParameter("低战力主力编队数"), { target: { value: "4" } });
     expect(summary).toHaveTextContent("1 / 2 / 3 / 3 主力编队");
 
     fireEvent.click(screen.getByRole("button", { name: "运行仿真" }));
@@ -83,7 +132,7 @@ describe("simulation dashboard", () => {
 
   test("renders an absent first PvP result as not occurred", async () => {
     render(<SimulationDashboard />);
-    fireEvent.change(screen.getByLabelText("战斗时长（小时）"), { target: { value: "1" } });
+    fireEvent.change(showParameter("战斗时长（小时）"), { target: { value: "1" } });
     fireEvent.click(screen.getByRole("button", { name: "运行仿真" }));
     await waitFor(() => expect(screen.getByText("结果已应用")).toBeInTheDocument());
 
@@ -94,21 +143,21 @@ describe("simulation dashboard", () => {
     render(<SimulationDashboard />);
     const run = screen.getByRole("button", { name: "运行仿真" });
 
-    fireEvent.change(screen.getByLabelText("初始 AP"), { target: { value: "150" } });
+    fireEvent.change(showParameter("初始 AP"), { target: { value: "150" } });
 
     expect(run).toBeDisabled();
     expect(screen.getByRole("alert")).toHaveAttribute("data-validation-id", "ap.custom");
     expect(screen.getByRole("alert")).toHaveTextContent("初始 AP 不能超过 AP 上限");
 
     fireEvent.click(screen.getByRole("button", { name: "恢复默认" }));
-    expect(screen.getByLabelText("初始 AP")).toHaveValue(50);
+    expect(showParameter("初始 AP")).toHaveValue(50);
     expect(run).toBeEnabled();
   }, 15000);
 
   test("blocks Run with a stable issue when strategy assignment weights do not total 100%", () => {
     render(<SimulationDashboard />);
 
-    fireEvent.change(screen.getByLabelText("策略分配活跃度权重"), { target: { value: "60" } });
+    fireEvent.change(showParameter("策略分配活跃度权重"), { target: { value: "60" } });
 
     expect(screen.getByRole("button", { name: "运行仿真" })).toBeDisabled();
     const schemaIssue = screen.getAllByRole("alert").find((alert) =>
@@ -119,8 +168,8 @@ describe("simulation dashboard", () => {
 
   test("shows the applied linear morale formula and matching anchors", async () => {
     render(<SimulationDashboard />);
-    fireEvent.change(screen.getByLabelText("战斗时长（小时）"), { target: { value: "1" } });
-    fireEvent.change(screen.getByLabelText("士气公式模式"), { target: { value: "linear" } });
+    fireEvent.change(showParameter("战斗时长（小时）"), { target: { value: "1" } });
+    fireEvent.change(showParameter("士气公式模式"), { target: { value: "linear" } });
     fireEvent.click(screen.getByRole("button", { name: "运行仿真" }));
     await waitFor(() => expect(screen.getByText("结果已应用")).toBeInTheDocument());
     fireEvent.click(screen.getByRole("tab", { name: "战斗与士气" }));
@@ -133,8 +182,8 @@ describe("simulation dashboard", () => {
 
   test("shows reward values and marginal values scaled by the applied multiplier", async () => {
     render(<SimulationDashboard />);
-    fireEvent.change(screen.getByLabelText("战斗时长（小时）"), { target: { value: "1" } });
-    fireEvent.change(screen.getByLabelText("奖励价值倍率"), { target: { value: "2" } });
+    fireEvent.change(showParameter("战斗时长（小时）"), { target: { value: "1" } });
+    fireEvent.change(showParameter("奖励价值倍率"), { target: { value: "2" } });
     fireEvent.click(screen.getByRole("button", { name: "运行仿真" }));
     await waitFor(() => expect(screen.getByText("结果已应用")).toBeInTheDocument());
     fireEvent.click(screen.getByRole("tab", { name: "任务与奖励" }));
@@ -273,5 +322,17 @@ describe("simulation dashboard", () => {
     expect(container.querySelector(".map-canvas-wrap")).toHaveAttribute("data-orientation", "pointy-top");
     expect(dashboardStyles).toMatch(/@media\s*\(max-width:\s*900px\)[\s\S]*\.parameter-sidebar/);
     expect(dashboardStyles).toMatch(/\.parameter-sidebar\[data-open="true"\]/);
+  }, 15000);
+  test("keeps lightweight score visuals synchronized and opens a selected player's ledger", () => {
+    render(<SimulationDashboard />);
+
+    expect(screen.getByRole("img", { name: "联盟累计积分走势" })).toBeInTheDocument();
+    fireEvent.change(screen.getByRole("slider", { name: "回放时间" }), { target: { value: "0" } });
+    expect(screen.getByTestId("score-replay-hour")).toHaveTextContent("T+0h");
+
+    fireEvent.click(screen.getByRole("tab", { name: "玩家与联盟排名" }));
+    const playerButton = screen.getAllByRole("button", { name: /查看.+积分流水/ })[0];
+    fireEvent.click(playerButton);
+    expect(screen.getByRole("region", { name: /积分流水/ })).toBeInTheDocument();
   }, 15000);
 });

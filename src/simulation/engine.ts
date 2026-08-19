@@ -9,6 +9,7 @@ import { enqueueTroop, resolveTileBattleTick } from "./battle-queue";
 import { assignPlayerFronts, buildAllianceFronts, frontForTile } from "./fronts";
 import { calculateMorale } from "./morale";
 import { occupationSeconds, syncOccupation } from "./occupation";
+import { battleScoreDelta, type PlayerScoreEvent } from "./score-events";
 import type { TileRuntimeState, TroopState } from "./state";
 import {
   chooseCenterRushTarget,
@@ -28,11 +29,14 @@ export interface ReplayTileStatus {
   frontMorale: number | null;
 }
 
+export interface AllianceScoreTotals { battle: number; occupation: number; total: number; }
+
 export interface ReplaySnapshot {
   second: number;
   hour: number;
   owners: Record<number, AllianceId>;
   scores: [number, number, number];
+  scoreTotals: [AllianceScoreTotals, AllianceScoreTotals, AllianceScoreTotals];
   territory: [number, number, number];
   pvpEvents: number;
   activeBattles: number;
@@ -82,6 +86,7 @@ export interface SimulationResult {
   snapshots: ReplaySnapshot[];
   events: SimulationEvent[];
   timeline: TimelineEvent[];
+  scoreEvents: PlayerScoreEvent[];
   players: Player[];
   alliances: AllianceResult[];
   finalOwners: Record<number, AllianceId>;
@@ -127,9 +132,21 @@ function createSnapshot(
   activeFrontIds: Set<string>,
   contestedTileCounts: Map<TileId, number>,
   config: SimulationConfig,
+  players: readonly Player[],
 ): ReplaySnapshot {
   const scores: [number, number, number] = [0, 0, 0];
   const territory: [number, number, number] = [0, 0, 0];
+  const scoreTotals: [AllianceScoreTotals, AllianceScoreTotals, AllianceScoreTotals] = [
+    { battle: 0, occupation: 0, total: 0 },
+    { battle: 0, occupation: 0, total: 0 },
+    { battle: 0, occupation: 0, total: 0 },
+  ];
+  for (const player of players) {
+    const row = scoreTotals[player.allianceId - 1];
+    row.battle += player.battleScore;
+    row.occupation += player.occupationScore;
+    row.total += player.personalScore;
+  }
   for (const tile of map.tiles) {
     const owner = owners.get(tile.tileId) ?? 0;
     if (owner > 0) {
@@ -155,6 +172,7 @@ function createSnapshot(
     hour: second / 3600,
     owners: Object.fromEntries(owners),
     scores,
+    scoreTotals,
     territory,
     pvpEvents,
     activeBattles,
@@ -237,7 +255,8 @@ export function runSimulation({ map, config, population, seed }: SimulationInput
   const activeFrontIds = new Set<string>();
   const events: SimulationEvent[] = [];
   const timeline: TimelineEvent[] = [];
-  const snapshots: ReplaySnapshot[] = [createSnapshot(map, owners, states, 0, 0, activeFrontIds, contestedTileCounts, config)];
+  const scoreEvents: PlayerScoreEvent[] = [];
+  const snapshots: ReplaySnapshot[] = [createSnapshot(map, owners, states, 0, 0, activeFrontIds, contestedTileCounts, config, players)];
   let troopSequence = 0;
   let pvpCount = 0;
   let firstPvpHour: number | null = null;
@@ -436,7 +455,27 @@ export function runSimulation({ map, config, population, seed }: SimulationInput
 
       activeFrontIds.add(frontByAllianceTile.get(attackerCamp)!.get(state.tileId)!);
       activeFrontIds.add(frontByAllianceTile.get(defenderCamp)!.get(state.tileId)!);
-      for (const [playerId, kills] of result.killsByPlayer) runtimeByPlayer.get(playerId)!.player.kills += kills;
+      for (const [playerId, kills] of result.killsByPlayer) {
+        const player = runtimeByPlayer.get(playerId)!.player;
+        const previousKills = player.kills;
+        player.kills += kills;
+        const delta = battleScoreDelta(previousKills, kills, config.scoring.killsPerPoint);
+        if (delta > 0) {
+          player.battleScore += delta;
+          player.personalScore += delta;
+          scoreEvents.push({
+            second,
+            playerId: player.id,
+            allianceId: player.allianceId,
+            source: "battle",
+            delta,
+            totalAfter: player.personalScore,
+            tileId: state.tileId,
+            kills,
+            cumulativeKills: player.kills,
+          });
+        }
+      }
       for (const troopId of result.releasedTroopIds) releaseTroop(troopId);
       const winner = result.battle.winner === "attacker" ? state.defenseQueue.find((unit) => unit.allianceId === attackerCamp) ?? state.attackQueue[0] : state.defenseQueue[0];
       if (winner) runtimeByPlayer.get(winner.playerId)!.player.maxWinStreak = Math.max(runtimeByPlayer.get(winner.playerId)!.player.maxWinStreak, winner.consecutiveWins);
@@ -478,7 +517,18 @@ export function runSimulation({ map, config, population, seed }: SimulationInput
       const points = tileValue(tile.configId, config);
       const player = runtimeByPlayer.get(occupier.playerId)!.player;
       player.occupationScore += points;
+      player.personalScore += points;
       player.occupations += 1;
+      if (points > 0) scoreEvents.push({
+        second,
+        playerId: player.id,
+        allianceId: player.allianceId,
+        source: "occupation",
+        delta: points,
+        totalAfter: player.personalScore,
+        tileId: state.tileId,
+        tileType: tileType(tile),
+      });
       events.push({ hour: second / 3600, type: "capture", allianceId: camp, tileId: state.tileId, previousOwner, playerId: player.id });
       let retainedCenterGarrison = false;
       if (state.attackQueue.length === 0) {
@@ -497,7 +547,7 @@ export function runSimulation({ map, config, population, seed }: SimulationInput
     }
 
     if (second % 3600 === 0) {
-      snapshots.push(createSnapshot(map, owners, states, second, pvpCount, activeFrontIds, contestedTileCounts, config));
+      snapshots.push(createSnapshot(map, owners, states, second, pvpCount, activeFrontIds, contestedTileCounts, config, players));
     }
   }
 
@@ -528,6 +578,7 @@ export function runSimulation({ map, config, population, seed }: SimulationInput
     snapshots,
     events,
     timeline,
+    scoreEvents,
     players,
     alliances: allianceResults,
     finalOwners: final.owners,

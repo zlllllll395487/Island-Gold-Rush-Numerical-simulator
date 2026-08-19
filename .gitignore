@@ -39,6 +39,7 @@ yarn-error.log*
 /outputs/
 /work/
 /.worktrees/
+/.superpowers/
 
 # local preview logs
 /.dev-server.log

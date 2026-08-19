@@ -206,11 +206,13 @@ function buildTotals(draft: SimulationConfig): TotalStatus[] {
 
 export function ParameterPanel({ draft, validation, onChange, onReset }: ParameterPanelProps) {
   const [query, setQuery] = useState("");
+  const [activeGroup, setActiveGroup] = useState<ParameterGroupId>("basic");
   const normalizedQuery = query.trim().toLocaleLowerCase("zh-CN");
   const totals = buildTotals(draft);
   const visibleByGroup = useMemo(() => {
     const result = new Map<ParameterGroupId, ParameterCatalogEntry[]>();
     for (const group of PARAMETER_GROUPS) {
+      if (!normalizedQuery && group.id !== activeGroup) continue;
       const matchesGroup = group.label.toLocaleLowerCase("zh-CN").includes(normalizedQuery);
       const entries = PARAMETER_CATALOG.filter(
         (entry) =>
@@ -223,7 +225,7 @@ export function ParameterPanel({ draft, validation, onChange, onReset }: Paramet
       if (entries.length > 0) result.set(group.id, entries);
     }
     return result;
-  }, [normalizedQuery]);
+  }, [activeGroup, normalizedQuery]);
 
   return (
     <section className="parameter-panel" data-layout="vertical" data-testid="parameter-panel">
@@ -244,6 +246,32 @@ export function ParameterPanel({ draft, validation, onChange, onReset }: Paramet
         />
       </label>
 
+      <nav className="parameter-chapter-index" aria-label={"\u53c2\u6570\u7ae0\u8282"}>
+        {PARAMETER_GROUPS.map((group, index) => (
+          <button
+            type="button"
+            key={group.id}
+            aria-current={!normalizedQuery && activeGroup === group.id ? "page" : undefined}
+            onClick={() => {
+              setQuery("");
+              setActiveGroup(group.id);
+            }}
+          >
+            <span>{String(index + 1).padStart(2, "0")}</span>
+            <strong>{group.label}</strong>
+            <small>{PARAMETER_CATALOG.filter((entry) => entry.group === group.id).length}</small>
+          </button>
+        ))}
+      </nav>
+
+      {normalizedQuery ? (
+        <p className="parameter-search-results" data-testid="parameter-search-results">
+          {Array.from(visibleByGroup.keys())
+            .map((id) => PARAMETER_GROUPS.find((group) => group.id === id)?.label)
+            .filter(Boolean)
+            .join(" / ")}
+        </p>
+      ) : null}
       {validation.map((issue) => (
         <p className="parameter-validation" role="alert" data-validation-id={issue.id} key={issue.id}>
           {issue.message}
@@ -259,7 +287,7 @@ export function ParameterPanel({ draft, validation, onChange, onReset }: Paramet
           const groupTotals = totals.filter((status) => status.group === group.id);
 
           return (
-            <details className="parameter-group" key={group.id} open={Boolean(normalizedQuery) || group.defaultOpen}>
+            <details className="parameter-group" key={group.id} open>
               <summary>{group.label}</summary>
               <div className="parameter-group__controls">
                 {regularEntries.map((entry) => (
