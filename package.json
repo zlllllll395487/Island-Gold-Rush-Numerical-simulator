@@ -9,6 +9,7 @@
     "dev": "vinext dev",
     "build": "vinext build",
     "build:pages": "vite build --config vite.pages.config.ts",
+    "verify:pages": "node scripts/verify-pages-build.mjs",
     "start": "vinext start",
     "test": "vitest run",
     "test:watch": "vitest",

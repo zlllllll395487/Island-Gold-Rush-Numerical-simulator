@@ -44,3 +44,4 @@ yarn-error.log*
 # local preview logs
 /.dev-server.log
 /.dev-server.err.log
+/dist-pages/

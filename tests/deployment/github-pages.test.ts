@@ -30,4 +30,18 @@ describe("GitHub Pages static deployment", () => {
     expect(existsSync(resolve(outputDir, "favicon.svg"))).toBe(true);
     expect(existsSync(resolve(outputDir, "og-v3.png"))).toBe(true);
   }, 30_000);
+
+  test("validates the generated Pages artifact with the repository verifier", () => {
+    const command = process.platform === "win32" ? (process.env.ComSpec ?? "cmd.exe") : "npm";
+    const args = process.platform === "win32"
+      ? ["/d", "/s", "/c", "npm run verify:pages"]
+      : ["run", "verify:pages"];
+    const verify = spawnSync(command, args, {
+      cwd: projectRoot,
+      encoding: "utf8",
+    });
+
+    expect(verify.status, verify.stdout + verify.stderr).toBe(0);
+    expect(verify.stdout).toContain("Pages build verified");
+  });
 });
