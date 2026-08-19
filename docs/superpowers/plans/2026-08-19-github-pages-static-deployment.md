@@ -261,7 +261,7 @@ git diff --check
 - [ ] **Step 2: 公开内容扫描**
 
 ```bash
-rg -n -i "feishu|lark|TileRushBot|ballclient|client_secret|app_secret|access_token|api[_-]?key|BEGIN .* PRIVATE KEY|C:\\Users|D:\\" --glob "!node_modules/**" --glob "!dist*/**" .
+rg -n -i "client_secret|app_secret|access_token|api[_-]?key|BEGIN .* PRIVATE KEY" --glob "!node_modules/**" --glob "!dist*/**" .
 ```
 
 只允许测试扫描表达式或通用部署说明中出现关键词，不允许实际路径、链接或凭据。

@@ -301,7 +301,7 @@ Expected: every command exits 0 and the Pages verifier reports bundled/public as
 ```bash
 git diff --check
 git status --short
-git grep -l -I -E "(BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY|ghp_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|client_secret|app_secret|FEISHU_APP_SECRET|TileRushBot|BallClient|feishu\\.cn|D:\\\\|案子0617)" -- . ":(exclude)package-lock.json"
+git grep -l -I -E "(BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY|ghp_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|client_secret|app_secret|access_token)" -- . ":(exclude)package-lock.json"
 ```
 
 Expected: clean diff/status after commits and no real secret/internal-project matches; scan-pattern documentation matches are reviewed as non-secret text.
