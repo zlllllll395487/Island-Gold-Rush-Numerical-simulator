@@ -14,7 +14,7 @@ export type ParameterGroupId =
 export interface ParameterGroup {
   id: ParameterGroupId;
   label: string;
-  defaultOpen?: boolean;
+  description: string;
 }
 
 export interface ParameterOption {
@@ -37,17 +37,17 @@ export interface ParameterCatalogEntry {
 }
 
 export const PARAMETER_GROUPS: readonly ParameterGroup[] = [
-  { id: "basic", label: "基础参数", defaultOpen: true },
-  { id: "population", label: "人口与战力", defaultOpen: true },
-  { id: "activity", label: "活跃度" },
-  { id: "strategy", label: "行为策略", defaultOpen: true },
-  { id: "ap", label: "行动力" },
-  { id: "occupation", label: "占领节奏" },
-  { id: "combat", label: "战斗" },
-  { id: "morale", label: "士气" },
-  { id: "scoring", label: "计分" },
-  { id: "tasksRewards", label: "任务与奖励" },
-  { id: "batch", label: "批量实验" },
+  { id: "basic", label: "基础参数", description: "本局规模、随机性与目标时间" },
+  { id: "population", label: "人口与战力", description: "玩家分层、战力分布与编队强度" },
+  { id: "activity", label: "活跃度", description: "玩家活跃分布与行动力使用倾向" },
+  { id: "strategy", label: "行为策略", description: "中心冲锋、支援扩张与多线推进动机" },
+  { id: "ap", label: "行动力", description: "行动力投放、恢复和出征成本" },
+  { id: "occupation", label: "占领节奏", description: "推进距离与占领时长控制" },
+  { id: "combat", label: "战斗", description: "战斗队列、兵力与胜负计算" },
+  { id: "morale", label: "士气", description: "士气边界、衰减和战力系数" },
+  { id: "scoring", label: "计分", description: "战功与占领积分规则" },
+  { id: "tasksRewards", label: "任务与奖励", description: "任务阈值、覆盖率和奖励梯度" },
+  { id: "batch", label: "批量实验", description: "多种子实验规模与稳定性观察" },
 ] as const;
 
 const number = (

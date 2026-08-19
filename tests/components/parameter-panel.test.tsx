@@ -52,7 +52,7 @@ function renderPanel(draft: SimulationConfig = structuredClone(DEFAULT_CONFIG)) 
 
 function selectGroup(groupId: (typeof PARAMETER_GROUPS)[number]["id"]) {
   const group = PARAMETER_GROUPS.find((entry) => entry.id === groupId)!;
-  const navigation = screen.getByRole("navigation", { name: /\u53c2\u6570\u7ae0\u8282/ });
+  const navigation = screen.getByRole("navigation", { name: /\u53c2\u6570\u5206\u7c7b/ });
   fireEvent.click(within(navigation).getByRole("button", { name: new RegExp(group.label) }));
 }
 
@@ -112,7 +112,7 @@ describe("parameter panel", () => {
   test("renders an eleven-chapter vertical inspector with native controls and compact task rows", () => {
     const { container } = renderPanel();
     const panel = screen.getByTestId("parameter-panel");
-    const navigation = screen.getByRole("navigation", { name: /\u53c2\u6570\u7ae0\u8282/ });
+    const navigation = screen.getByRole("navigation", { name: /\u53c2\u6570\u5206\u7c7b/ });
 
     expect(panel).toHaveAttribute("data-layout", "vertical");
     expect(within(navigation).getAllByRole("button")).toHaveLength(11);

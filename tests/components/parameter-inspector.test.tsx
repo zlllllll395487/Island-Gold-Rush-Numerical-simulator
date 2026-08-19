@@ -9,6 +9,31 @@ const POPULATION = "\u4eba\u53e3\u4e0e\u6218\u529b";
 const TASKS = "\u4efb\u52a1\u4e0e\u5956\u52b1";
 
 describe("parameter chapter inspector", () => {
+  test("uses a persistent category navigator with a replacing current-category editor", () => {
+    render(
+      <ParameterPanel
+        draft={structuredClone(DEFAULT_CONFIG)}
+        validation={[]}
+        onChange={vi.fn()}
+        onReset={vi.fn()}
+      />,
+    );
+
+    const index = screen.getByTestId("parameter-category-nav");
+    const editor = screen.getByTestId("parameter-category-editor");
+    expect(index).toHaveAccessibleName("参数分类");
+    expect(editor).toHaveTextContent(BASIC);
+    expect(editor).toHaveTextContent("项参数");
+    expect(screen.getByLabelText("随机种子")).toBeInTheDocument();
+    expect(screen.queryByLabelText("低战力基础战力")).not.toBeInTheDocument();
+    expect(document.querySelector("details")).toBeNull();
+
+    fireEvent.click(within(index).getByRole("button", { name: new RegExp(POPULATION) }));
+
+    expect(editor).toHaveTextContent(POPULATION);
+    expect(screen.getByLabelText("低战力基础战力")).toBeInTheDocument();
+    expect(screen.queryByLabelText("随机种子")).not.toBeInTheDocument();
+  });
   test("shows an eleven-chapter index and only the selected chapter controls", () => {
     render(
       <ParameterPanel
@@ -19,7 +44,7 @@ describe("parameter chapter inspector", () => {
       />,
     );
 
-    const index = screen.getByRole("navigation", { name: "\u53c2\u6570\u7ae0\u8282" });
+    const index = screen.getByRole("navigation", { name: "\u53c2\u6570\u5206\u7c7b" });
     expect(within(index).getAllByRole("button")).toHaveLength(11);
     expect(within(index).getByRole("button", { name: new RegExp(BASIC) })).toHaveAttribute("aria-current", "page");
     expect(screen.getByLabelText("\u968f\u673a\u79cd\u5b50")).toBeInTheDocument();

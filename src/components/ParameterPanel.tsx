@@ -246,7 +246,7 @@ export function ParameterPanel({ draft, validation, onChange, onReset }: Paramet
         />
       </label>
 
-      <nav className="parameter-chapter-index" aria-label={"\u53c2\u6570\u7ae0\u8282"}>
+      <nav className="parameter-chapter-index" data-testid="parameter-category-nav" aria-label="参数分类">
         {PARAMETER_GROUPS.map((group, index) => (
           <button
             type="button"
@@ -278,7 +278,7 @@ export function ParameterPanel({ draft, validation, onChange, onReset }: Paramet
         </p>
       ))}
 
-      <div className="parameter-panel__groups">
+      <div className="parameter-panel__groups" data-testid="parameter-category-editor">
         {PARAMETER_GROUPS.map((group) => {
           const entries = visibleByGroup.get(group.id);
           if (!entries) return null;
@@ -287,8 +287,8 @@ export function ParameterPanel({ draft, validation, onChange, onReset }: Paramet
           const groupTotals = totals.filter((status) => status.group === group.id);
 
           return (
-            <details className="parameter-group" key={group.id} open>
-              <summary>{group.label}</summary>
+            <section className="parameter-group" key={group.id}>
+              <header className="parameter-group__header"><p>{group.description}</p><h3>{group.label}</h3><span>{entries.length} 项参数</span></header>
               <div className="parameter-group__controls">
                 {regularEntries.map((entry) => (
                   <ParameterControl key={entry.path} draft={draft} entry={entry} onChange={onChange} />
@@ -315,7 +315,7 @@ export function ParameterPanel({ draft, validation, onChange, onReset }: Paramet
                   );
                 })}
               </div>
-            </details>
+            </section>
           );
         })}
       </div>
