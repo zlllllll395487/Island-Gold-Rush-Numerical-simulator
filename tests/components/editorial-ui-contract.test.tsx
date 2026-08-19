@@ -8,6 +8,8 @@ describe("editorial research workspace contract", () => {
 
     expect(container.querySelector("main")).toHaveClass("editorial-workspace");
     expect(screen.getByTestId("simulator-brand-mark")).toHaveAttribute("aria-hidden", "true");
+    const topbar = screen.getByRole("banner", { name: "模拟器导航" });
+    expect(within(topbar).getAllByRole("tab")).toHaveLength(6);
 
     const panel = screen.getByTestId("parameter-panel");
     const navigation = within(panel).getByRole("navigation", { name: "参数分类" });
@@ -15,6 +17,7 @@ describe("editorial research workspace contract", () => {
     expect(within(navigation).getAllByRole("button")).toHaveLength(11);
     expect(within(navigation).getByRole("button", { name: /基础参数/ })).toHaveAttribute("aria-current", "page");
     expect(within(panel).getByTestId("parameter-category-editor")).toBeInTheDocument();
+    expect(within(screen.getByTestId("parameter-sidebar")).queryByRole("tab")).toBeNull();
     expect(container.querySelector("details, summary")).toBeNull();
   }, 15000);
 

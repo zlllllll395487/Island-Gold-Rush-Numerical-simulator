@@ -40,7 +40,12 @@ describe("simulation dashboard", () => {
     expect(container.querySelector(".decision-rail")).toBeNull();
     expect(screen.queryByText(/数值指挥中心|决策信号|参数实验台|战场事件流|本局建议|从地图读懂|从差异判断|Simulation findings/i)).not.toBeInTheDocument();
 
-    const tabs = screen.getAllByRole("tab");
+    const topbar = screen.getByRole("banner", { name: "模拟器导航" });
+    expect(within(topbar).getByText("海岛夺金 · 数值模拟")).toBeInTheDocument();
+    expect(within(topbar).getByRole("button", { name: "运行仿真" })).toBeInTheDocument();
+    expect(within(screen.getByTestId("parameter-sidebar")).queryByRole("tab")).toBeNull();
+
+    const tabs = within(topbar).getAllByRole("tab");
     expect(tabs.map((tab) => tab.textContent)).toEqual(TABS);
   }, 15000);
 

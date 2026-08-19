@@ -193,6 +193,41 @@ export function SimulationDashboardV2() {
 
   return (
     <main className="simulation-app editorial-workspace">
+      <header className="simulation-topbar" aria-label="模拟器导航">
+        <div className="simulation-topbar__brand">
+          <SimulatorBrandMark />
+          <div><strong>海岛夺金 · 数值模拟</strong><p>数值分析工作区</p></div>
+        </div>
+        <div className="simulation-topbar__tabs" role="tablist" aria-label="分析页面">
+          {TABS.map((name) => (
+            <button
+              key={name}
+              type="button"
+              role="tab"
+              aria-selected={tab === name}
+              aria-controls="analysis-workspace"
+              onClick={() => {
+                setTab(name);
+                if (compactLayout && drawerOpen) setDrawerOpen(false);
+                focusNextFrame(workspaceRef);
+              }}
+            >
+              {name}
+            </button>
+          ))}
+        </div>
+        <div className="simulation-topbar__actions">
+          <div className="simulation-topbar__status">
+            <span>种子 <b data-testid="applied-seed">{applied.seed}</b></span>
+            <strong className={dirty ? "draft-status is-dirty" : "draft-status"}>{dirty ? "草稿待运行" : "结果已应用"}</strong>
+          </div>
+          <button className="secondary-button" type="button" onClick={() => runSingle("reproduce")} disabled={running || validation.length > 0}>按当前种子复现</button>
+          <button className="run-button" type="button" onClick={() => runSingle("random")} disabled={running || validation.length > 0}>
+            {running ? "仿真运行中…" : "运行仿真"}
+          </button>
+        </div>
+      </header>
+
       <button
         ref={toggleRef}
         className="parameter-drawer-toggle"
@@ -219,50 +254,12 @@ export function SimulationDashboardV2() {
         inert={compactLayout && !drawerOpen ? true : undefined}
         aria-hidden={compactLayout && !drawerOpen ? true : undefined}
         data-testid="parameter-sidebar"
-        aria-label="模拟参数与页面导航"
+        aria-label="模拟参数"
       >
-        <header className="product-brand">
-          <SimulatorBrandMark />
-          <div><strong>海岛夺金 · 数值模拟</strong><p>参数调整</p></div>
-        </header>
-        <div className="analysis-tabs" role="tablist" aria-label="分析页面">
-          {TABS.map((name) => (
-            <button
-              key={name}
-              type="button"
-              role="tab"
-              aria-selected={tab === name}
-              aria-controls="analysis-workspace"
-              onClick={() => {
-                setTab(name);
-                if (compactLayout) {
-                  setDrawerOpen(false);
-                  focusNextFrame(workspaceRef);
-                }
-              }}
-            >
-              {name}
-            </button>
-          ))}
-        </div>
         <ParameterPanel draft={draft} validation={validation} onChange={updateDraft} onReset={resetDraft} />
       </aside>
 
-      <section className="analysis-shell">
-        <header className="analysis-header">
-          <div>
-            <p>当前应用种子 <span data-testid="applied-seed">{applied.seed}</span></p>
-            <strong className={dirty ? "draft-status is-dirty" : "draft-status"}>{dirty ? "草稿待运行" : "结果已应用"}</strong>
-          </div>
-          <div className="run-actions">
-            <button className="secondary-button" type="button" onClick={() => runSingle("reproduce")} disabled={running || validation.length > 0}>按当前种子复现</button>
-            <button className="run-button" type="button" onClick={() => runSingle("random")} disabled={running || validation.length > 0}>
-              {running ? "仿真运行中…" : "运行仿真"}
-            </button>
-          </div>
-        </header>
-
-        <DecisionSummary metrics={metrics} targetRange={applied.targets.firstPvpHours} />
+      <section className="analysis-shell">        <DecisionSummary metrics={metrics} targetRange={applied.targets.firstPvpHours} />
 
         <section ref={workspaceRef} id="analysis-workspace" className="analysis-workspace" data-testid="analysis-workspace" tabIndex={-1}>
 
