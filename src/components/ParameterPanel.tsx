@@ -158,6 +158,20 @@ function ParameterControl({
   );
 }
 
+const POWER_TIER_ROWS = [
+  { id: "low", label: "低战力" },
+  { id: "mid", label: "中战力" },
+  { id: "high", label: "高战力" },
+  { id: "super", label: "超高战力" },
+] as const;
+
+const POWER_MATRIX_FIELDS = [
+  { id: "powerShares", label: "玩家占比" },
+  { id: "basePower", label: "基础战力" },
+  { id: "powerSigma", label: "战力波动" },
+  { id: "mainFormationCounts", label: "主力编队" },
+  { id: "weakFormationScale", label: "普通编队强度" },
+] as const;
 function sum(values: readonly number[]): number {
   return values.reduce((total, value) => total + value, 0);
 }
@@ -212,7 +226,6 @@ export function ParameterPanel({ draft, validation, onChange, onReset }: Paramet
   const visibleByGroup = useMemo(() => {
     const result = new Map<ParameterGroupId, ParameterCatalogEntry[]>();
     for (const group of PARAMETER_GROUPS) {
-      if (!normalizedQuery && group.id !== activeGroup) continue;
       const matchesGroup = group.label.toLocaleLowerCase("zh-CN").includes(normalizedQuery);
       const entries = PARAMETER_CATALOG.filter(
         (entry) =>
@@ -225,7 +238,7 @@ export function ParameterPanel({ draft, validation, onChange, onReset }: Paramet
       if (entries.length > 0) result.set(group.id, entries);
     }
     return result;
-  }, [activeGroup, normalizedQuery]);
+  }, [normalizedQuery]);
 
   return (
     <section className="parameter-panel" data-layout="vertical" data-variant="editorial" data-testid="parameter-panel">
@@ -251,10 +264,16 @@ export function ParameterPanel({ draft, validation, onChange, onReset }: Paramet
           <button
             type="button"
             key={group.id}
-            aria-current={!normalizedQuery && activeGroup === group.id ? "page" : undefined}
+            aria-current={activeGroup === group.id ? "page" : undefined}
+            aria-controls={`parameter-section-${group.id}`}
             onClick={() => {
               setQuery("");
               setActiveGroup(group.id);
+              const scrollToSection = () => document
+                .getElementById(`parameter-section-${group.id}`)
+                ?.scrollIntoView?.({ behavior: "smooth", block: "start" });
+              if (normalizedQuery) window.requestAnimationFrame(scrollToSection);
+              else scrollToSection();
             }}
           >
             <span>{String(index + 1).padStart(2, "0")}</span>
@@ -287,24 +306,54 @@ export function ParameterPanel({ draft, validation, onChange, onReset }: Paramet
           const groupTotals = totals.filter((status) => status.group === group.id);
 
           return (
-            <section className="parameter-group" key={group.id}>
+            <section id={`parameter-section-${group.id}`} className="parameter-group" data-testid={`parameter-section-${group.id}`} key={group.id}>
               <header className="parameter-group__header"><p>{group.description}</p><h3>{group.label}</h3><span>{entries.length} 项参数</span></header>
               <div className="parameter-group__controls">
-                {regularEntries.map((entry) => (
-                  <ParameterControl key={entry.path} draft={draft} entry={entry} onChange={onChange} />
-                ))}
-                {Array.from({ length: 10 }, (_, taskIndex) => {
-                  const rowEntries = taskEntries.filter((entry) => entry.taskIndex === taskIndex);
-                  if (rowEntries.length === 0) return null;
-                  return (
-                    <div className="parameter-task-row" data-testid={`task-row-${taskIndex + 1}`} key={taskIndex}>
-                      <strong>任务 {taskIndex + 1}</strong>
-                      {rowEntries.map((entry) => (
-                        <ParameterControl key={entry.path} draft={draft} entry={entry} onChange={onChange} />
-                      ))}
+                {group.id === "population" ? (
+                  <>
+                    <div className="parameter-table-wrap">
+                      <table className="parameter-matrix" aria-label="人口与战力参数">
+                        <thead><tr><th>档位</th>{POWER_MATRIX_FIELDS.map((field) => <th key={field.id}>{field.label}</th>)}</tr></thead>
+                        <tbody>
+                          {POWER_TIER_ROWS.map((tier) => (
+                            <tr key={tier.id}>
+                              <th scope="row">{tier.label}</th>
+                              {POWER_MATRIX_FIELDS.map((field) => {
+                                const entry = entries.find((candidate) => candidate.path === `population.${field.id}.${tier.id}`);
+                                return <td key={field.id}>{entry ? <ParameterControl draft={draft} entry={entry} onChange={onChange} /> : null}</td>;
+                              })}
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
                     </div>
-                  );
-                })}
+                    {regularEntries
+                      .filter((entry) => !POWER_MATRIX_FIELDS.some((field) => entry.path.startsWith(`population.${field.id}.`)))
+                      .map((entry) => <ParameterControl key={entry.path} draft={draft} entry={entry} onChange={onChange} />)}
+                  </>
+                ) : (
+                  regularEntries.map((entry) => (
+                    <ParameterControl key={entry.path} draft={draft} entry={entry} onChange={onChange} />
+                  ))
+                )}
+                {group.id === "tasksRewards" && taskEntries.length > 0 ? (
+                  <div className="parameter-table-wrap">
+                    <table className="parameter-task-table" aria-label="任务参数">
+                      <thead><tr><th>任务</th><th>积分阈值</th><th>目标覆盖率</th><th>奖励价值</th></tr></thead>
+                      <tbody>
+                        {Array.from({ length: 10 }, (_, taskIndex) => {
+                          const rowEntries = taskEntries.filter((entry) => entry.taskIndex === taskIndex);
+                          return (
+                            <tr className="parameter-task-row" data-testid={`task-row-${taskIndex + 1}`} key={taskIndex}>
+                              <th scope="row">任务 {taskIndex + 1}</th>
+                              {rowEntries.map((entry) => <td key={entry.path}><ParameterControl draft={draft} entry={entry} onChange={onChange} /></td>)}
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : null}
                 {groupTotals.map((status) => {
                   const valid = totalIsValid(status);
                   return (

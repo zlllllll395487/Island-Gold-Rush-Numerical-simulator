@@ -151,16 +151,26 @@
 .parameter-panel__groups {
   display: grid;
   grid-column: 2;
+  align-content: start;
+  gap: 44px;
   min-width: 0;
   border-left: 1px solid var(--fine-rule, #d6d4cb);
-  padding: 28px 22px 48px;
+  padding: 28px 26px 64px;
 }
 
 .parameter-group {
   min-width: 0;
+  scroll-margin-top: 24px;
   border: 0;
+  border-top: 1px solid var(--fine-rule, #d6d4cb);
   border-radius: 0;
+  padding-top: 34px;
   background: transparent;
+}
+
+.parameter-group:first-child {
+  border-top: 0;
+  padding-top: 0;
 }
 
 .parameter-group__header {
@@ -302,6 +312,84 @@
   color: #a43c34;
 }
 
+.parameter-table-wrap {
+  width: 100%;
+  overflow-x: auto;
+}
+
+.parameter-matrix,
+.parameter-task-table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+
+.parameter-matrix th,
+.parameter-matrix td,
+.parameter-task-table th,
+.parameter-task-table td {
+  border-bottom: 1px solid var(--fine-rule, #d6d4cb);
+  padding: 10px 8px;
+  text-align: left;
+  vertical-align: middle;
+}
+
+.parameter-matrix thead th,
+.parameter-task-table thead th {
+  color: var(--muted-ink, #707771);
+  font-size: 10px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.parameter-matrix tbody > tr > th,
+.parameter-task-table tbody > tr > th {
+  color: var(--ink, #18211e);
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.parameter-matrix th:first-child { width: 72px; }
+.parameter-task-table th:first-child { width: 58px; }
+
+.parameter-matrix .parameter-control,
+.parameter-task-table .parameter-control,
+.parameter-task-row .parameter-control {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 4px;
+}
+
+.parameter-matrix .parameter-control label,
+.parameter-task-table .parameter-control label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.parameter-matrix .parameter-control input,
+.parameter-matrix .parameter-control select,
+.parameter-task-table .parameter-control input,
+.parameter-task-table .parameter-control select {
+  grid-column: 1;
+  min-width: 72px;
+}
+
+.parameter-matrix .parameter-control output,
+.parameter-task-table .parameter-control output {
+  justify-self: start;
+}
+
+.parameter-task-table .parameter-task-row {
+  display: table-row;
+  padding: 0;
+  border: 0;
+}
 @media (max-width: 900px) {
   .parameter-panel {
     grid-template-columns: minmax(0, 1fr);

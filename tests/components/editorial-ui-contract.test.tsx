@@ -17,6 +17,7 @@ describe("editorial research workspace contract", () => {
     expect(within(navigation).getAllByRole("button")).toHaveLength(11);
     expect(within(navigation).getByRole("button", { name: /基础参数/ })).toHaveAttribute("aria-current", "page");
     expect(within(panel).getByTestId("parameter-category-editor")).toBeInTheDocument();
+    expect(within(panel).getAllByTestId(/^parameter-section-/)).toHaveLength(11);
     expect(within(screen.getByTestId("parameter-sidebar")).queryByRole("tab")).toBeNull();
     expect(container.querySelector("details, summary")).toBeNull();
   }, 15000);

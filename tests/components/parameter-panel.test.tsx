@@ -133,6 +133,35 @@ describe("parameter panel", () => {
     expect(container.querySelector("details, summary")).toBeNull();
   });
 
+  test("renders every chapter together and uses the category index as smooth anchors", () => {
+    const scrollIntoView = vi.fn();
+    Object.defineProperty(HTMLElement.prototype, "scrollIntoView", { configurable: true, value: scrollIntoView });
+    try {
+      renderPanel();
+
+      expect(screen.getAllByTestId(/^parameter-section-/)).toHaveLength(11);
+      expect(screen.getByTestId("parameter-section-basic")).toBeVisible();
+      expect(screen.getByTestId("parameter-section-tasksRewards")).toBeVisible();
+
+      const navigation = screen.getByRole("navigation", { name: "参数分类" });
+      fireEvent.click(within(navigation).getByRole("button", { name: /任务与奖励/ }));
+      expect(scrollIntoView).toHaveBeenCalledWith({ behavior: "smooth", block: "start" });
+    } finally {
+      delete (HTMLElement.prototype as { scrollIntoView?: unknown }).scrollIntoView;
+    }
+  });
+  test("organizes power tiers and tasks into readable parameter tables", () => {
+    renderPanel();
+
+    const populationTable = screen.getByRole("table", { name: "人口与战力参数" });
+    expect(within(populationTable).getAllByRole("row")).toHaveLength(5);
+    expect(within(populationTable).getByRole("row", { name: /超高战力/ })).toBeInTheDocument();
+
+    const taskTable = screen.getByRole("table", { name: "任务参数" });
+    expect(within(taskTable).getAllByRole("row")).toHaveLength(11);
+    expect(screen.getByLabelText("超高战力普通编队强度")).toBeInTheDocument();
+    expect(screen.getByLabelText("任务 10 奖励价值")).toBeInTheDocument();
+  });
   test("shows the approved 45/25/30 strategy mix", () => {
     renderPanel();
     selectGroup("strategy");
@@ -147,7 +176,6 @@ describe("parameter panel", () => {
     const invalidDefaults: string[] = [];
 
     for (const group of PARAMETER_GROUPS) {
-      selectGroup(group.id);
       for (const entry of PARAMETER_CATALOG.filter((candidate) => candidate.group === group.id)) {
         const control = screen.getByLabelText(entry.label);
         if (!(control instanceof HTMLInputElement)) continue;
@@ -165,7 +193,6 @@ describe("parameter panel", () => {
     const driftedPaths: string[] = [];
 
     for (const group of PARAMETER_GROUPS) {
-      selectGroup(group.id);
       for (const entry of PARAMETER_CATALOG.filter((candidate) => candidate.group === group.id)) {
         const control = screen.getByLabelText(entry.label) as HTMLInputElement | HTMLSelectElement;
         const current = getParameterValue(DEFAULT_CONFIG, entry.path);

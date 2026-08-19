@@ -127,7 +127,7 @@
 }
 .editorial-workspace .simulation-topbar__status .draft-status { font-size: 10px; }
 .editorial-workspace {
-  grid-template-columns: clamp(360px, 27vw, 400px) minmax(0, 1fr);
+  grid-template-columns: clamp(580px, 42vw, 760px) minmax(0, 1fr);
   grid-template-rows: 72px minmax(0, 1fr);
   min-height: 100vh;
 }
