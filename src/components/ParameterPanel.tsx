@@ -17,6 +17,7 @@ export interface ParameterValidationIssue {
 }
 
 export interface ParameterPanelProps {
+  activeGroup?: ParameterGroupId;
   draft: SimulationConfig;
   validation: readonly ParameterValidationIssue[];
   onChange: (next: SimulationConfig) => void;
@@ -113,6 +114,7 @@ function ParameterControl({
   entry,
   onChange,
 }: {
+  activeGroup?: ParameterGroupId;
   draft: SimulationConfig;
   entry: ParameterCatalogEntry;
   onChange: (next: SimulationConfig) => void;
@@ -218,14 +220,14 @@ function buildTotals(draft: SimulationConfig): TotalStatus[] {
   ];
 }
 
-export function ParameterPanel({ draft, validation, onChange, onReset }: ParameterPanelProps) {
+export function ParameterPanel({ activeGroup = "basic", draft, validation, onChange, onReset }: ParameterPanelProps) {
   const [query, setQuery] = useState("");
-  const [activeGroup, setActiveGroup] = useState<ParameterGroupId>("basic");
+
   const normalizedQuery = query.trim().toLocaleLowerCase("zh-CN");
   const totals = buildTotals(draft);
   const visibleByGroup = useMemo(() => {
     const result = new Map<ParameterGroupId, ParameterCatalogEntry[]>();
-    for (const group of PARAMETER_GROUPS) {
+    for (const group of PARAMETER_GROUPS.filter((candidate) => candidate.id === activeGroup)) {
       const matchesGroup = group.label.toLocaleLowerCase("zh-CN").includes(normalizedQuery);
       const entries = PARAMETER_CATALOG.filter(
         (entry) =>
@@ -238,7 +240,7 @@ export function ParameterPanel({ draft, validation, onChange, onReset }: Paramet
       if (entries.length > 0) result.set(group.id, entries);
     }
     return result;
-  }, [normalizedQuery]);
+  }, [activeGroup, normalizedQuery]);
 
   return (
     <section className="parameter-panel" data-layout="vertical" data-variant="editorial" data-testid="parameter-panel">
@@ -259,29 +261,6 @@ export function ParameterPanel({ draft, validation, onChange, onReset }: Paramet
         />
       </label>
 
-      <nav className="parameter-chapter-index" data-testid="parameter-category-nav" aria-label="参数分类">
-        {PARAMETER_GROUPS.map((group, index) => (
-          <button
-            type="button"
-            key={group.id}
-            aria-current={activeGroup === group.id ? "page" : undefined}
-            aria-controls={`parameter-section-${group.id}`}
-            onClick={() => {
-              setQuery("");
-              setActiveGroup(group.id);
-              const scrollToSection = () => document
-                .getElementById(`parameter-section-${group.id}`)
-                ?.scrollIntoView?.({ behavior: "smooth", block: "start" });
-              if (normalizedQuery) window.requestAnimationFrame(scrollToSection);
-              else scrollToSection();
-            }}
-          >
-            <span>{String(index + 1).padStart(2, "0")}</span>
-            <strong>{group.label}</strong>
-            <small>{PARAMETER_CATALOG.filter((entry) => entry.group === group.id).length}</small>
-          </button>
-        ))}
-      </nav>
 
       {normalizedQuery ? (
         <p className="parameter-search-results" data-testid="parameter-search-results">
@@ -320,7 +299,7 @@ export function ParameterPanel({ draft, validation, onChange, onReset }: Paramet
                               <th scope="row">{tier.label}</th>
                               {POWER_MATRIX_FIELDS.map((field) => {
                                 const entry = entries.find((candidate) => candidate.path === `population.${field.id}.${tier.id}`);
-                                return <td key={field.id}>{entry ? <ParameterControl draft={draft} entry={entry} onChange={onChange} /> : null}</td>;
+                                return <td data-label={field.label} key={field.id}>{entry ? <ParameterControl draft={draft} entry={entry} onChange={onChange} /> : null}</td>;
                               })}
                             </tr>
                           ))}
@@ -346,7 +325,7 @@ export function ParameterPanel({ draft, validation, onChange, onReset }: Paramet
                           return (
                             <tr className="parameter-task-row" data-testid={`task-row-${taskIndex + 1}`} key={taskIndex}>
                               <th scope="row">任务 {taskIndex + 1}</th>
-                              {rowEntries.map((entry) => <td key={entry.path}><ParameterControl draft={draft} entry={entry} onChange={onChange} /></td>)}
+                              {rowEntries.map((entry) => <td data-label={entry.label.replace(/^任务 \d+ /, "")} key={entry.path}><ParameterControl draft={draft} entry={entry} onChange={onChange} /></td>)}
                             </tr>
                           );
                         })}

@@ -1,94 +1,73 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 import { vi } from "vitest";
 import { ParameterPanel } from "../../src/components/ParameterPanel";
 import { DEFAULT_CONFIG } from "../../src/domain/defaults";
 
-const BASIC = "\u57fa\u7840\u53c2\u6570";
-const POPULATION = "\u4eba\u53e3\u4e0e\u6218\u529b";
-const TASKS = "\u4efb\u52a1\u4e0e\u5956\u52b1";
+function panel(group: "basic" | "population" | "tasksRewards") {
+  return (
+    <ParameterPanel
+      activeGroup={group}
+      draft={structuredClone(DEFAULT_CONFIG)}
+      validation={[]}
+      onChange={vi.fn()}
+      onReset={vi.fn()}
+    />
+  );
+}
 
-describe("parameter chapter inspector", () => {
-  test("uses a persistent category navigator with a replacing current-category editor", () => {
-    render(
-      <ParameterPanel
-        draft={structuredClone(DEFAULT_CONFIG)}
-        validation={[]}
-        onChange={vi.fn()}
-        onReset={vi.fn()}
-      />,
-    );
+describe("parameter category editor", () => {
+  test("renders only the requested parameter category without its own directory", () => {
+    render(panel("population"));
 
-    const index = screen.getByTestId("parameter-category-nav");
     const editor = screen.getByTestId("parameter-category-editor");
-    expect(index).toHaveAccessibleName("参数分类");
-    expect(editor).toHaveTextContent(BASIC);
-    expect(editor).toHaveTextContent("项参数");
+    expect(screen.queryByTestId("parameter-category-nav")).not.toBeInTheDocument();
+    expect(editor).not.toHaveTextContent("基础参数");
+    expect(editor).toHaveTextContent("人口与战力");
+    expect(screen.queryByLabelText("随机种子")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("低战力基础战力")).toBeInTheDocument();
+    expect(document.querySelector("details, summary")).toBeNull();
+  });
+
+  test("replaces the editor contents when the selected category changes", () => {
+    const { rerender } = render(panel("basic"));
     expect(screen.getByLabelText("随机种子")).toBeInTheDocument();
     expect(screen.queryByLabelText("低战力基础战力")).not.toBeInTheDocument();
-    expect(document.querySelector("details")).toBeNull();
 
-    fireEvent.click(within(index).getByRole("button", { name: new RegExp(POPULATION) }));
-
-    expect(editor).toHaveTextContent(POPULATION);
-    expect(screen.getByLabelText("低战力基础战力")).toBeInTheDocument();
+    rerender(panel("population"));
     expect(screen.queryByLabelText("随机种子")).not.toBeInTheDocument();
-  });
-  test("shows an eleven-chapter index and only the selected chapter controls", () => {
-    render(
-      <ParameterPanel
-        draft={structuredClone(DEFAULT_CONFIG)}
-        validation={[]}
-        onChange={vi.fn()}
-        onReset={vi.fn()}
-      />,
-    );
+    expect(screen.getByLabelText("低战力基础战力")).toBeInTheDocument();
 
-    const index = screen.getByRole("navigation", { name: "\u53c2\u6570\u5206\u7c7b" });
-    expect(within(index).getAllByRole("button")).toHaveLength(11);
-    expect(within(index).getByRole("button", { name: new RegExp(BASIC) })).toHaveAttribute("aria-current", "page");
-    expect(screen.getByLabelText("\u968f\u673a\u79cd\u5b50")).toBeInTheDocument();
-    expect(screen.queryByLabelText("\u4f4e\u6218\u529b\u57fa\u7840\u6218\u529b")).not.toBeInTheDocument();
-
-    fireEvent.click(within(index).getByRole("button", { name: new RegExp(POPULATION) }));
-    expect(screen.getByLabelText("\u4f4e\u6218\u529b\u57fa\u7840\u6218\u529b")).toBeInTheDocument();
-    expect(screen.queryByLabelText("\u968f\u673a\u79cd\u5b50")).not.toBeInTheDocument();
-
-    fireEvent.click(within(index).getByRole("button", { name: new RegExp(TASKS) }));
+    rerender(panel("tasksRewards"));
     expect(screen.getAllByTestId(/^task-row-/)).toHaveLength(10);
   });
 
-  test("searches across chapters and reports the matching chapter", () => {
-    render(
-      <ParameterPanel
-        draft={structuredClone(DEFAULT_CONFIG)}
-        validation={[]}
-        onChange={vi.fn()}
-        onReset={vi.fn()}
-      />,
-    );
-
-    fireEvent.change(screen.getByRole("searchbox", { name: "\u641c\u7d22\u53c2\u6570" }), {
-      target: { value: "\u8d85\u9ad8\u6218\u529b\u666e\u901a\u7f16\u961f\u5f3a\u5ea6" },
+  test("searches only inside the active category", () => {
+    render(panel("population"));
+    fireEvent.change(screen.getByRole("searchbox", { name: "搜索参数" }), {
+      target: { value: "超高战力普通编队强度" },
     });
 
-    expect(screen.getByLabelText("\u8d85\u9ad8\u6218\u529b\u666e\u901a\u7f16\u961f\u5f3a\u5ea6")).toBeInTheDocument();
-    expect(screen.getByTestId("parameter-search-results")).toHaveTextContent(POPULATION);
+    expect(screen.getByLabelText("超高战力普通编队强度")).toBeInTheDocument();
+    expect(screen.queryByLabelText("低战力基础战力")).not.toBeInTheDocument();
+    expect(screen.getByTestId("parameter-search-results")).toHaveTextContent("人口与战力");
   });
 
-  test("marks the parameter workspace as editorial without adding category chrome", () => {
-    render(
-      <ParameterPanel
-        draft={structuredClone(DEFAULT_CONFIG)}
-        validation={[]}
-        onChange={vi.fn()}
-        onReset={vi.fn()}
-      />,
-    );
+  test("provides visible field metadata for drawer-native matrix cards", () => {
+    const { rerender } = render(panel("population"));
+    const populationCells = Array.from(document.querySelectorAll(".parameter-matrix td"));
+    expect(populationCells.length).toBeGreaterThan(0);
+    expect(populationCells.every((cell) => Boolean(cell.getAttribute("data-label")))).toBe(true);
 
+    rerender(panel("tasksRewards"));
+    const taskCells = Array.from(document.querySelectorAll(".parameter-task-table td"));
+    expect(taskCells.length).toBeGreaterThan(0);
+    expect(taskCells.every((cell) => Boolean(cell.getAttribute("data-label")))).toBe(true);
+  });
+  test("keeps the editor visual language restrained and editorial", () => {
+    render(panel("basic"));
     expect(screen.getByTestId("parameter-panel")).toHaveAttribute("data-variant", "editorial");
-    const nav = screen.getByTestId("parameter-category-nav");
-    expect(within(nav).getByRole("button", { name: new RegExp(BASIC) })).toHaveAttribute("aria-current", "page");
+    expect(screen.queryByTestId("parameter-category-nav")).not.toBeInTheDocument();
     expect(document.querySelector("details, summary")).toBeNull();
   });
 });

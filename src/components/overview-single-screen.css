@@ -1,0 +1,219 @@
+.simulation-app.editorial-workspace .analysis-header,
+.simulation-app.editorial-workspace .decision-summary,
+.simulation-app.editorial-workspace .analysis-workspace {
+  width: min(calc(100% - 40px), 1440px);
+  max-width: 1440px;
+}
+
+.simulation-app.editorial-workspace .decision-summary { padding: 10px 0 12px; }
+.simulation-app.editorial-workspace .decision-summary__heading h1 { font-size: clamp(27px, 2.35vw, 36px); }
+.simulation-app.editorial-workspace .decision-summary__metrics { gap: 22px; margin-top: 9px; }
+.simulation-app.editorial-workspace .decision-summary__metrics article { padding-bottom: 7px; }
+.simulation-app.editorial-workspace .decision-diagnosis { margin-top: 7px; }
+.simulation-app.editorial-workspace .analysis-workspace { padding-bottom: 10px; }
+.simulation-app.editorial-workspace .overview-report { display: grid; gap: 12px; }
+
+.simulation-app.editorial-workspace .overview-map-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 158px;
+  border-top: 1px solid var(--fine-rule);
+  border-bottom: 1px solid var(--fine-rule);
+}
+
+.simulation-app.editorial-workspace .overview-map-figure {
+  grid-column: auto;
+  min-width: 0;
+  padding: 9px 14px 7px 0;
+  border-right: 1px solid var(--fine-rule);
+}
+
+.simulation-app.editorial-workspace .overview-map-figure .figure-heading {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 18px;
+  margin-bottom: 7px;
+}
+.simulation-app.editorial-workspace .overview-map-figure .figure-heading h2 { font-size: 19px; }
+.simulation-app.editorial-workspace .overview-map-figure .map-stage { padding: 0; }
+.simulation-app.editorial-workspace .overview-map-figure .map-canvas-wrap {
+  height: clamp(270px, 29vh, 300px);
+  min-height: 270px;
+  max-height: 300px;
+}
+.simulation-app.editorial-workspace .overview-map-figure .map-canvas { height: 100%; min-height: 0; }
+.simulation-app.editorial-workspace .overview-map-figure .timeline { padding-top: 5px; }
+.simulation-app.editorial-workspace .overview-map-figure .map-legend { margin-top: 3px; }
+
+.map-view-switch,
+.chart-mode-switch {
+  display: inline-flex;
+  gap: 2px;
+  margin: 0;
+  padding: 2px;
+  border: 1px solid var(--fine-rule);
+}
+.map-view-switch label,
+.chart-mode-switch label { cursor: pointer; }
+.map-view-switch input,
+.chart-mode-switch input { position: absolute; opacity: 0; pointer-events: none; }
+.map-view-switch span,
+.chart-mode-switch span {
+  display: block;
+  padding: 5px 9px;
+  color: var(--muted-ink);
+  font-size: 10px;
+  white-space: nowrap;
+}
+.map-view-switch input:checked + span,
+.chart-mode-switch input:checked + span { color: #f7f4eb; background: #13221f; }
+
+.simulation-app.editorial-workspace .overview-current-state {
+  display: grid;
+  grid-template-rows: auto repeat(3, 1fr);
+  padding: 12px 0 8px 15px;
+}
+.simulation-app.editorial-workspace .overview-current-state h2 { margin: 0 0 4px; font-size: 16px; }
+.simulation-app.editorial-workspace .overview-current-state p {
+  display: grid;
+  align-content: center;
+  gap: 3px;
+  margin: 0;
+  border-top: 1px solid var(--fine-rule);
+}
+.simulation-app.editorial-workspace .overview-current-state span { color: var(--muted-ink); font-size: 10px; line-height: 1.25; }
+.simulation-app.editorial-workspace .overview-current-state strong {
+  font-family: var(--font-display);
+  font-size: 23px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+.simulation-app.editorial-workspace .overview-analytics-grid {
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+}
+.simulation-app.editorial-workspace .overview-primary-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.25fr) minmax(0, .75fr);
+  gap: 20px;
+  min-width: 0;
+}
+.simulation-app.editorial-workspace .overview-secondary-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 20px;
+  min-width: 0;
+}
+.overview-chart {
+  min-width: 0;
+  padding-top: 9px;
+  border-top: 1px solid var(--fine-rule);
+}
+.overview-chart__heading {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 38px;
+}
+.overview-chart__heading p { margin: 0 0 2px; color: var(--editorial-accent); font-size: 9px; font-weight: 700; letter-spacing: .1em; }
+.overview-chart__heading h2 { margin: 0; font-family: var(--font-display); font-size: 17px; font-weight: 650; }
+.overview-chart__heading > span { color: var(--muted-ink); font-size: 9px; white-space: nowrap; }
+.overview-chart svg { display: block; width: 100%; height: 160px; margin-top: 5px; overflow: visible; }
+.overview-primary-grid .strategic-trend-chart svg { height: 276px; }
+.overview-secondary-grid .overview-chart svg { height: 154px; }
+.analytics-grid { stroke: #dcdad2; stroke-width: .65; }
+.analytics-zero-line { stroke: #77786f; stroke-width: .8; stroke-dasharray: 3 3; }
+.heatmap-value { font: 8px var(--font-sans); font-weight: 700; }
+.pareto-equality-line { stroke: #b9b8b1; stroke-width: 1; stroke-dasharray: 4 4; }
+.pareto-curve { stroke: #009c8d; stroke-width: 2.4; }
+.pareto-marker { fill: #009c8d; }
+.pareto-key { background: #009c8d; }
+.analytics-axis-label,
+.analytics-end-label { font: 8px var(--font-sans); }
+.analytics-axis-label { fill: #77786f; }
+.rank-change-marker { fill: var(--editorial-accent); }
+.overview-chart__legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  min-height: 19px;
+  color: var(--muted-ink);
+  font-size: 9px;
+}
+.overview-chart__legend span { display: inline-flex; align-items: center; gap: 4px; }
+.overview-chart__legend i { width: 13px; height: 2px; }
+.overview-chart__legend em { margin-left: auto; color: var(--editorial-accent); font-style: normal; }
+
+.battle-metric-strip {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+  margin-top: 7px;
+  padding: 6px 0;
+  border-top: 1px solid var(--fine-rule);
+  border-bottom: 1px solid var(--fine-rule);
+}
+.battle-metric-strip span { color: var(--muted-ink); font-size: 8.5px; white-space: nowrap; }
+.battle-metric-strip strong { display: block; margin-top: 2px; color: var(--ink); font-family: var(--font-display); font-size: 16px; font-weight: 550; }
+.battle-rhythm-chart svg { height: 122px; margin-top: 2px; }
+.battle-bar { fill: #557b8c; opacity: .76; }
+.capture-bar { fill: #a88642; opacity: .82; }
+.average-battle-score-line { stroke: #009c8d; stroke-width: 2; }
+.battle-key { background: #557b8c; }
+.capture-key { background: #a88642; }
+.average-key { background: #009c8d; }
+.player-contribution-chart circle { vector-effect: non-scaling-stroke; stroke-width: 1; }
+.simulation-app.editorial-workspace .simulation-workload {
+  margin: 4px 0 0;
+  overflow: hidden;
+  color: var(--muted-ink);
+  font-size: 8px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.player-segment-chart, .player-pareto-chart { min-width: 0; }
+.overview-model-note {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 3px;
+  padding-top: 5px;
+  border-top: 1px solid var(--fine-rule);
+  color: var(--muted-ink);
+  font-size: 8px;
+  white-space: nowrap;
+}
+
+/* Kept for older result views outside the new overview. */
+.simulation-app.editorial-workspace .overview-bottom-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(300px, .65fr);
+  gap: 18px;
+}
+
+.simulation-app.editorial-workspace[data-parameter-drawer-open="true"] .analysis-shell {
+  box-sizing: border-box;
+  padding-left: 440px;
+  transition: padding-left .2s ease;
+}
+
+@media (max-width: 1180px) {
+  .simulation-app.editorial-workspace .overview-primary-grid { grid-template-columns: minmax(0, 1fr); }
+  .simulation-app.editorial-workspace .overview-primary-grid .strategic-trend-chart svg { height: 190px; }
+  .simulation-app.editorial-workspace .overview-secondary-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 900px) {
+  .simulation-app.editorial-workspace[data-parameter-drawer-open="true"] .analysis-shell { padding-left: 0; }
+  .simulation-app.editorial-workspace .overview-map-row,
+  .simulation-app.editorial-workspace .overview-secondary-grid,
+  .simulation-app.editorial-workspace .overview-bottom-row { grid-template-columns: minmax(0, 1fr); }
+  .simulation-app.editorial-workspace .overview-map-figure { padding-right: 0; border-right: 0; }
+  .simulation-app.editorial-workspace .overview-current-state { grid-template-columns: repeat(3, minmax(0, 1fr)); grid-template-rows: auto 1fr; gap: 12px; padding: 10px 0 0; }
+  .simulation-app.editorial-workspace .overview-current-state h2 { grid-column: 1 / -1; }
+  .simulation-app.editorial-workspace .overview-current-state p { min-height: 66px; }
+}

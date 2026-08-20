@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import rawMap from "../data/tilerush-map.json";
 import { calculateMatchMetrics, summarizeBatch } from "../analytics/metrics";
+import { overviewAt, overviewReplaySeries, playerContributionAt, tileBattleHeatAt } from "../analytics/overview-analytics";
 import { DEFAULT_CONFIG } from "../domain/defaults";
 import { parseSimulationConfig } from "../domain/schemas";
 import type { ActivityTier, BehaviorStrategy, PowerTier, SimulationConfig } from "../domain/types";
@@ -11,10 +12,13 @@ import { buildMatchedPopulation } from "../population/match-alliances";
 import { moraleMultiplier } from "../simulation/morale";
 import { runSimulation } from "../simulation/engine";
 import { nextSimulationSeed, summarizeSimulationWorkload, type SimulationWorkload } from "../simulation/run-session";
-import { HexMapCanvasV2 } from "./HexMapCanvasV2";
+import { HexMapCanvasV2, type MapViewMode } from "./HexMapCanvasV2";
+import { AllianceGapChart, BattleRhythmChart, PlayerContributionPareto, PlayerSegmentHeatmap } from "./OverviewAnalyticsCharts";
 import { DecisionSummary } from "./DecisionSummary";
+import { ParameterCategoryRail } from "./ParameterCategoryRail";
+import { PARAMETER_GROUPS, type ParameterGroupId } from "./parameter-catalog";
 import { ParameterPanel, type ParameterValidationIssue } from "./ParameterPanel";
-import { PlayerScoreLedger, ReplayScoreSummary } from "./ReplayScoreSummary";
+import { PlayerDetailDrawer } from "./PlayerDetailDrawer";
 import { SimulatorBrandMark } from "./SimulatorBrandMark";
 
 const MAP = loadCanonicalMap(rawMap);
@@ -40,6 +44,7 @@ const compact = (value: number) => new Intl.NumberFormat("zh-CN", {
   notation: value > 999_999 ? "compact" : "standard",
   maximumFractionDigits: 1,
 }).format(value);
+const hourlyAverage = (value: number) => new Intl.NumberFormat("zh-CN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value);
 const percent = (value: number) => `${Math.round(value * 100)}%`;
 
 const VALIDATION_MESSAGES: Record<string, string> = {
@@ -80,13 +85,15 @@ export function SimulationDashboardV2() {
   const [applied, setApplied] = useState<SimulationConfig>(() => structuredClone(DEFAULT_CONFIG));
   const [result, setResult] = useState(() => simulate(DEFAULT_CONFIG));
   const [hour, setHour] = useState(DEFAULT_CONFIG.battleHours);
+  const [mapViewMode, setMapViewMode] = useState<MapViewMode>("ownership");
   const [dirty, setDirty] = useState(false);
   const [running, setRunning] = useState(false);
   const [workload, setWorkload] = useState<SimulationWorkload | null>(null);
   const [selectedPlayerId, setSelectedPlayerId] = useState<string | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [activeParameterGroup, setActiveParameterGroup] = useState<ParameterGroupId>("basic");
   const [compactLayout, setCompactLayout] = useState(false);
-  const toggleRef = useRef<HTMLButtonElement>(null);
+  const parameterTriggerRef = useRef<HTMLButtonElement | null>(null);
   const sidebarRef = useRef<HTMLElement>(null);
   const workspaceRef = useRef<HTMLElement>(null);
   const [batchRunning, setBatchRunning] = useState(false);
@@ -106,41 +113,46 @@ export function SimulationDashboardV2() {
   }, []);
 
   useEffect(() => {
-    if (!compactLayout || !drawerOpen) return;
+    if (!drawerOpen) return;
     const frame = window.requestAnimationFrame(() => {
       sidebarRef.current?.querySelector<HTMLElement>('input[type="search"]')?.focus();
     });
     return () => window.cancelAnimationFrame(frame);
-  }, [compactLayout, drawerOpen]);
+  }, [drawerOpen]);
 
   const focusNextFrame = (target: React.RefObject<HTMLElement | null>) => {
     window.requestAnimationFrame(() => target.current?.focus());
   };
+  const closeParameterDrawer = () => {
+    setDrawerOpen(false);
+    window.requestAnimationFrame(() => parameterTriggerRef.current?.focus());
+  };
+
+  useEffect(() => {
+    if (!drawerOpen) return;
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") closeParameterDrawer();
+    };
+    document.addEventListener("keydown", closeOnEscape);
+    return () => document.removeEventListener("keydown", closeOnEscape);
+  }, [drawerOpen]);
+  const activeParameterMeta = PARAMETER_GROUPS.find((group) => group.id === activeParameterGroup)!;
   const validation = useMemo(() => validateSimulationDraft(draft), [draft]);
   const metrics = useMemo(() => calculateMatchMetrics(result, applied), [result, applied]);
   const snapshot = result.snapshots[Math.min(result.snapshots.length - 1, Math.max(0, Math.round(hour)))];
+  const overviewSeries = useMemo(() => overviewReplaySeries(result), [result]);
+  const visibleOverviewSeries = useMemo(() => overviewSeries.filter((point) => point.second <= snapshot.second), [overviewSeries, snapshot.second]);
+  const overviewCurrent = useMemo(() => overviewAt(result, snapshot.second), [result, snapshot.second]);
+  const currentHourlyAverageBattlePoints = visibleOverviewSeries.findLast((point) => point.hourlyBattles > 0)?.hourlyAverageBattlePoints ?? 0;
+  const currentBattleHeat = useMemo(() => tileBattleHeatAt(result, snapshot.second), [result, snapshot.second]);
+  const currentPlayerContribution = useMemo(() => playerContributionAt(result, snapshot.second), [result, snapshot.second]);
   const sortedAlliances = [...result.alliances].sort((left, right) => left.rank - right.rank);
   const selectedPlayer = selectedPlayerId ? result.players.find((player) => player.id === selectedPlayerId) ?? null : null;
   const totalPowerByAlliance = result.alliances.map((alliance) =>
     result.players.filter((player) => player.allianceId === alliance.id).reduce((sum, player) => sum + player.power, 0),
   );
   const alliancePowerRatio = Math.max(...totalPowerByAlliance) / Math.max(1, Math.min(...totalPowerByAlliance));
-  const tierRows = TIERS.map((tier) => ({
-    tier,
-    players: result.players.filter((player) => player.powerTier === tier).length,
-    share: result.players.filter((player) => player.powerTier === tier).length / result.players.length,
-    main: applied.population.mainFormationCounts[tier],
-    basePower: applied.population.basePower[tier],
-  }));
   const mainFormationHeadline = `${TIERS.map((tier) => applied.population.mainFormationCounts[tier]).join(" / ")} 主力编队`;
-  const centerShareByActivity = applied.activity.bands.map((band) => {
-    const players = result.players.filter((player) => player.activityTier === band.id);
-    return { tier: band.id, share: players.length ? players.filter((player) => player.behaviorStrategy === "centerRush").length / players.length : 0 };
-  });
-  const centerShareByPower = TIERS.map((tier) => {
-    const players = result.players.filter((player) => player.powerTier === tier);
-    return { tier, share: players.length ? players.filter((player) => player.behaviorStrategy === "centerRush").length / players.length : 0 };
-  });
 
   const updateDraft = (next: SimulationConfig) => {
     setDraft(next);
@@ -192,7 +204,7 @@ export function SimulationDashboardV2() {
   };
 
   return (
-    <main className="simulation-app editorial-workspace">
+    <main className="simulation-app editorial-workspace" data-parameter-drawer-open={drawerOpen ? "true" : "false"}>
       <header className="simulation-topbar" aria-label="模拟器导航">
         <div className="simulation-topbar__brand">
           <SimulatorBrandMark />
@@ -208,6 +220,7 @@ export function SimulationDashboardV2() {
               aria-controls="analysis-workspace"
               onClick={() => {
                 setTab(name);
+                setSelectedPlayerId(null);
                 if (compactLayout && drawerOpen) setDrawerOpen(false);
                 focusNextFrame(workspaceRef);
               }}
@@ -228,36 +241,43 @@ export function SimulationDashboardV2() {
         </div>
       </header>
 
-      <button
-        ref={toggleRef}
-        className="parameter-drawer-toggle"
-        type="button"
-        aria-controls="parameter-sidebar"
-        aria-expanded={drawerOpen}
-        onClick={() => {
-          if (drawerOpen) {
-            setDrawerOpen(false);
-            toggleRef.current?.focus();
-          } else {
-            setDrawerOpen(true);
+      <ParameterCategoryRail
+        activeGroup={activeParameterGroup}
+        expanded={drawerOpen}
+        onSelect={(group, trigger) => {
+          parameterTriggerRef.current = trigger;
+          if (drawerOpen && group === activeParameterGroup) {
+            closeParameterDrawer();
+            return;
           }
+          setActiveParameterGroup(group);
+          setDrawerOpen(true);
         }}
-      >
-        {drawerOpen ? "收起参数调整" : "展开参数调整"}
-      </button>
+      />
 
-      <aside
-        ref={sidebarRef}
-        id="parameter-sidebar"
-        className="parameter-sidebar"
-        data-open={drawerOpen}
-        inert={compactLayout && !drawerOpen ? true : undefined}
-        aria-hidden={compactLayout && !drawerOpen ? true : undefined}
-        data-testid="parameter-sidebar"
-        aria-label="模拟参数"
-      >
-        <ParameterPanel draft={draft} validation={validation} onChange={updateDraft} onReset={resetDraft} />
-      </aside>
+      {drawerOpen ? (
+        <>
+          <button className="parameter-drawer-backdrop" type="button" aria-label="关闭参数配置" onClick={closeParameterDrawer} />
+          <aside
+            ref={sidebarRef}
+            id="parameter-sidebar"
+            className="parameter-editor-drawer"
+            data-open="true"
+            data-testid="parameter-sidebar"
+            role="dialog"
+            aria-modal="true"
+            aria-label={activeParameterMeta.label + "配置"}
+          >
+            <ParameterPanel
+              activeGroup={activeParameterGroup}
+              draft={draft}
+              validation={validation}
+              onChange={updateDraft}
+              onReset={resetDraft}
+            />
+          </aside>
+        </>
+      ) : null}
 
       <section className="analysis-shell">        <DecisionSummary metrics={metrics} targetRange={applied.targets.firstPvpHours} />
 
@@ -265,53 +285,45 @@ export function SimulationDashboardV2() {
 
           {tab === "仿真总览" && (
             <div className="overview-report" data-testid="overview-report">
-              <section className="overview-map-figure map-panel map-plate-primary">
-                <header className="figure-heading">
-                  <div><p>地图回放</p><h2>T+{snapshot.hour.toFixed(0)}h · 地图回放</h2></div>
-                  <span>{snapshot.activeBattles} 场交战 · {snapshot.contestedTiles} 个争夺地格</span>
-                </header>
-                <div className="map-figure-layout">
-                  <div className="map-stage">
-                    <HexMapCanvasV2 map={MAP} snapshot={snapshot} />
-                    <label className="timeline"><span>回放时间</span><output>T+{hour}h</output><input aria-label="回放时间" type="range" min="0" max={applied.battleHours} value={hour} onChange={(event) => setHour(Number(event.target.value))} /></label>
-                    {workload ? <p className="simulation-workload" data-testid="simulation-workload">{compact(workload.tenSecondTicks)} 个时间步 · {compact(workload.timelineEvents)} 条事件 · 出征 {compact(workload.dispatches)} · 战斗 {compact(workload.battles)} · 占领 {compact(workload.captures)} · 积分流水 {compact(workload.scoreEvents)} · {workload.elapsedMs.toFixed(1)}ms</p> : null}
-                    <div className="map-legend"><strong>地格图例</strong>{["普通", "资源晶体", "核心", "山地", "水域", "交战/队列"].map((name, index) => <span key={name}><i className={"legend l" + index} />{name}</span>)}</div>
+              <div className="overview-analytics-grid" data-testid="overview-analytics-grid">
+                <div className="overview-primary-grid">
+                  <div className="overview-map-row" data-testid="overview-map-row">
+                    <section className="overview-map-figure map-panel map-plate-primary">
+                      <header className="figure-heading">
+                        <div><p>地图回放</p><h2>T+{snapshot.hour.toFixed(0)}h · 战局地图</h2></div>
+                        <fieldset className="map-view-switch" aria-label="地图视图">
+                          {(["ownership", "heat", "value"] as const).map((mode) => (
+                            <label key={mode}>
+                              <input type="radio" name="map-view" checked={mapViewMode === mode} onChange={() => setMapViewMode(mode)} />
+                              <span>{mode === "ownership" ? "联盟归属" : mode === "heat" ? "战斗热区" : "地格价值"}</span>
+                            </label>
+                          ))}
+                        </fieldset>
+                      </header>
+                      <div className="map-stage">
+                        <HexMapCanvasV2 map={MAP} snapshot={snapshot} mode={mapViewMode} battleHeat={currentBattleHeat} />
+                        <label className="timeline"><span>回放时间</span><output>T+{hour}h</output><input aria-label="回放时间" type="range" min="0" max={applied.battleHours} value={hour} onChange={(event) => setHour(Number(event.target.value))} /></label>
+                        <div className="map-legend"><strong>地格图例</strong>{["普通", "资源晶体", "核心", "山地", "水域", "交战/队列"].map((name, index) => <span key={name}><i className={"legend l" + index} />{name}</span>)}</div>
+                        {workload ? <p className="simulation-workload" data-testid="simulation-workload">{compact(workload.tenSecondTicks)} 个时间步 · {compact(workload.timelineEvents)} 条事件 · 出征 {compact(workload.dispatches)} · 战斗 {compact(workload.battles)} · 占领 {compact(workload.captures)} · 积分流水 {compact(workload.scoreEvents)} · {workload.elapsedMs.toFixed(1)}ms</p> : null}
+                      </div>
+                    </section>
+                    <aside className="overview-current-state" aria-label="当前战况">
+                      <h2>当前战况</h2>
+                      <p><span>总战斗次数</span><strong>{compact(overviewCurrent.totalBattles)}</strong></p>
+                      <p><span>每小时场均战功</span><strong>{hourlyAverage(currentHourlyAverageBattlePoints)}</strong></p>
+                      <p><span>领先联盟易手</span><strong>{overviewCurrent.rankChangeCount}</strong></p>
+                    </aside>
                   </div>
-                  <aside className="map-findings" aria-label="当前时刻指标">
-                    <h3>当前时刻</h3>
-                    <p><strong>{percent(metrics.centerContestIntensity.score)}</strong><span>中心争夺强度</span></p>
-                    <p><strong>{metrics.centerContestIntensity.battles}</strong><span>中心战斗</span></p>
-                    <p><strong>{metrics.centerContestIntensity.captures}</strong><span>中心易手</span></p>
-                  </aside>
+                  <AllianceGapChart points={overviewSeries} currentSecond={snapshot.second} />
                 </div>
-              </section>
-
-              <div className="overview-supporting-analysis">
-                <section className="analysis-card strategy-card">
-                  <header className="card-heading"><div><p>策略分析</p><h2>策略分布与实际表现</h2></div><span><span>中心地格争夺占比</span> <b>{percent(metrics.centerContestShare)}</b></span></header>
-                  <div className="table-scroll"><table><thead><tr><th>策略</th><th>玩家</th><th>实际占比</th><th>AP 使用</th><th>总分</th><th>击杀</th><th>占领</th><th>中心参与</th></tr></thead><tbody>
-                    {metrics.strategyMetrics.map((row) => <tr key={row.strategy}><th>{STRATEGY_NAMES[row.strategy]}</th><td>{row.players}</td><td>{percent(row.players / result.players.length)}</td><td>{percent(row.apUtilization)}</td><td>{compact(row.score)}</td><td>{compact(row.kills)}</td><td>{row.occupations}</td><td>{percent(row.centerContestShare)}</td></tr>)}
-                  </tbody></table></div>
-                </section>
-
-                <section className="analysis-card power-card">
-                  <header className="card-heading"><div><p>人口模型</p><h2>四档战力分布</h2></div><span><span>联盟战力比</span> <b>{alliancePowerRatio.toFixed(2)}</b></span></header>
-                  <div className="table-scroll"><table><thead><tr><th>档位</th><th>玩家数</th><th>实际占比</th><th>基础战力</th><th>主力编队</th></tr></thead><tbody>
-                    {tierRows.map((row) => <tr key={row.tier}><th>{TIER_NAMES[row.tier]}</th><td>{row.players}</td><td>{percent(row.share)}</td><td>{compact(row.basePower)}</td><td>{row.main}</td></tr>)}
-                  </tbody></table></div>
-                  <div className="model-facts"><span data-testid="main-formation-summary">{mainFormationHeadline}</span><span>{Number((applied.population.basePower.super / applied.population.basePower.low).toFixed(1))}× 超高/低档基础战力</span></div>
-                </section>
-
-                <section className="analysis-card mix-card">
-                  <header className="card-heading"><div><p>中心策略分配</p><h2>活跃度与战力倾向</h2></div></header>
-                  <div className="split-metrics"><div><h3>按活跃度</h3>{centerShareByActivity.map((row) => <p key={row.tier}><span>{ACTIVITY_NAMES[row.tier]}</span><b>{percent(row.share)}</b></p>)}</div><div><h3>按战力档</h3>{centerShareByPower.map((row) => <p key={row.tier}><span>{TIER_NAMES[row.tier]}</span><b>{percent(row.share)}</b></p>)}</div></div>
-                  <ReplayScoreSummary result={result} snapshot={snapshot} />
-                </section>
+                <div className="overview-secondary-grid">
+                  <BattleRhythmChart points={visibleOverviewSeries} metrics={overviewCurrent} />
+                  <PlayerSegmentHeatmap points={currentPlayerContribution} />
+                  <PlayerContributionPareto points={currentPlayerContribution} />
+                </div>
+                <footer className="overview-model-note"><span data-testid="main-formation-summary">{mainFormationHeadline}</span><span>{Number((applied.population.basePower.super / applied.population.basePower.low).toFixed(1))}× 超高/低档基础战力 · 联盟战力比 {alliancePowerRatio.toFixed(2)}</span></footer>
               </div>
-            </div>
-          )}
-
-          {tab === "行动力与占领" && (
+            </div>          )}          {tab === "行动力与占领" && (
             <div className="content-grid">
               <article className="result-card"><span>总体 AP 使用率</span><strong>{percent(metrics.apUtilization)}</strong><small>恢复溢出 {percent(metrics.apOverflowRate)}</small></article>
               <article className="result-card"><span>首次 PvP</span><strong>{fmtTime(metrics.firstPvpHour)}</strong><small>状态：{FIRST_PVP_STATUS_NAMES[metrics.firstPvpStatus]}</small></article>
@@ -335,9 +347,69 @@ export function SimulationDashboardV2() {
           )}
 
           {tab === "玩家与联盟排名" && (
-            <div className="ranking-layout"><section className="alliance-ranking">{sortedAlliances.map((alliance) => <article key={alliance.id} style={{ borderTopColor: ALLIANCE_COLORS[alliance.id - 1] }}><span>第 {alliance.rank} 名</span><h2>{alliance.name}</h2><strong>{alliance.snapshotScore}</strong><small>地图分 · {alliance.tileCount} 格 · 累计贡献 {alliance.contributionScore}</small></article>)}</section><section className="analysis-card player-ranking"><header className="card-heading"><div><p>当前单局</p><h2>玩家结果排名</h2></div></header><div className="table-scroll"><table><thead><tr><th>#</th><th>玩家</th><th>联盟</th><th>战力</th><th>策略</th><th>AP 使用</th><th>击杀</th><th>占领</th><th>总分</th></tr></thead><tbody>{[...result.players].sort((left, right) => right.personalScore - left.personalScore).map((player, index) => <tr key={player.id}><td>{index + 1}</td><th><button className="player-ledger-trigger" type="button" aria-label={`查看${player.name}积分流水`} onClick={() => setSelectedPlayerId(player.id)}>{player.name}</button><small>{player.id} · {TIER_NAMES[player.powerTier]}</small></th><td><i className="alliance-dot" style={{ background: ALLIANCE_COLORS[player.allianceId - 1] }} />{player.allianceId}</td><td>{compact(player.power)}</td><td>{STRATEGY_NAMES[player.behaviorStrategy]}</td><td>{percent(player.apSpent / Math.max(1, player.apSupply))}</td><td>{compact(player.kills)}</td><td>{player.occupations}</td><td><b>{player.personalScore}</b></td></tr>)}</tbody></table></div></section>{selectedPlayer ? <PlayerScoreLedger result={result} player={selectedPlayer} second={snapshot.second} /> : null}</div>
+            <>
+              <div className="ranking-layout">
+                <section className="alliance-ranking">
+                  {sortedAlliances.map((alliance) => (
+                    <article key={alliance.id} style={{ borderTopColor: ALLIANCE_COLORS[alliance.id - 1] }}>
+                      <span>第 {alliance.rank} 名</span>
+                      <h2>{alliance.name}</h2>
+                      <strong>{alliance.snapshotScore}</strong>
+                      <small>地图分 · {alliance.tileCount} 格 · 累计贡献 {alliance.contributionScore}</small>
+                    </article>
+                  ))}
+                </section>
+                <section className="analysis-card player-ranking">
+                  <header className="card-heading"><div><p>当前单局</p><h2>玩家结果排名</h2></div></header>
+                  <div className="table-scroll">
+                    <table>
+                      <thead><tr><th>#</th><th>玩家</th><th>联盟</th><th>战力</th><th>策略</th><th>AP 使用</th><th>击杀</th><th>占领</th><th>总分</th></tr></thead>
+                      <tbody>
+                        {[...result.players].sort((left, right) => right.personalScore - left.personalScore).map((player, index) => (
+                          <tr key={player.id}>
+                            <td>{index + 1}</td>
+                            <th>
+                              <button
+                                className="player-ledger-trigger"
+                                type="button"
+                                aria-label={`查看${player.name}积分流水`}
+                                aria-controls="player-detail-drawer"
+                                aria-expanded={selectedPlayerId === player.id}
+                                onClick={() => setSelectedPlayerId((current) => current === player.id ? null : player.id)}
+                              >
+                                {player.name}
+                              </button>
+                              <small>{player.id} · {TIER_NAMES[player.powerTier]}</small>
+                            </th>
+                            <td><i className="alliance-dot" style={{ background: ALLIANCE_COLORS[player.allianceId - 1] }} />{player.allianceId}</td>
+                            <td>{compact(player.power)}</td>
+                            <td>{STRATEGY_NAMES[player.behaviorStrategy]}</td>
+                            <td>{percent(player.apSpent / Math.max(1, player.apSupply))}</td>
+                            <td>{compact(player.kills)}</td>
+                            <td>{player.occupations}</td>
+                            <td><b>{player.personalScore}</b></td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </section>
+              </div>
+              {selectedPlayer ? (
+                <div id="player-detail-drawer">
+                  <PlayerDetailDrawer
+                    result={result}
+                    player={selectedPlayer}
+                    allianceName={result.alliances.find((alliance) => alliance.id === selectedPlayer.allianceId)?.name ?? `联盟 ${selectedPlayer.allianceId}`}
+                    hour={hour}
+                    maxHour={applied.battleHours}
+                    onHourChange={setHour}
+                    onClose={() => setSelectedPlayerId(null)}
+                  />
+                </div>
+              ) : null}
+            </>
           )}
-
           {tab === "批量实验" && (
             <section className="analysis-card batch-results-panel"><header className="card-heading"><div><p>基于当前已应用参数 · {applied.batchRuns} 局</p><h2>批量实验结果</h2></div><button type="button" className="secondary-button" disabled={batchRunning} onClick={runBatch}>{batchRunning ? "批量实验运行中…" : `运行 ${applied.batchRuns} 局实验`}</button></header>{batch ? <div className="batch-summary"><article><span>PvP 中位数</span><strong>{fmtTime(batch.firstPvpMedian)}</strong></article><article><span>目标命中率</span><strong>{percent(batch.firstPvpTargetRate)}</strong></article><article><span>统治风险</span><strong>{percent(batch.dominanceRisk)}</strong></article></div> : <p className="empty-state">尚未运行批量实验。运行后将在此显示跨随机种子的稳定性结果。</p>}</section>
           )}

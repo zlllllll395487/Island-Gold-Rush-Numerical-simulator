@@ -1,5 +1,3 @@
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 import { vi } from "vitest";
@@ -8,8 +6,7 @@ import { HexMapCanvasV2 } from "../../src/components/HexMapCanvasV2";
 import { loadCanonicalMap } from "../../src/map/map-loader";
 import type { ReplaySnapshot } from "../../src/simulation/engine";
 import { SimulationDashboardV2 as SimulationDashboard } from "../../src/components/SimulationDashboardV2";
-
-const dashboardStyles = readFileSync(resolve(process.cwd(), "src/components/simulator-v2.css"), "utf8");
+import { PARAMETER_CATALOG, PARAMETER_GROUPS } from "../../src/components/parameter-catalog";
 
 const TABS = [
   "仿真总览",
@@ -21,6 +18,13 @@ const TABS = [
 ] as const;
 
 function showParameter(label: string) {
+  const entry = PARAMETER_CATALOG.find((candidate) => candidate.label === label);
+  if (!entry) throw new Error(`Unknown parameter: ${label}`);
+  const group = PARAMETER_GROUPS.find((candidate) => candidate.id === entry.group);
+  if (!group) throw new Error(`Unknown parameter group: ${entry.group}`);
+  const categories = screen.getByRole("navigation", { name: "参数分类" });
+  const trigger = within(categories).getByRole("button", { name: new RegExp(group.label) });
+  if (trigger.getAttribute("aria-expanded") !== "true") fireEvent.click(trigger);
   fireEvent.change(screen.getByRole("searchbox", { name: /\u641c\u7d22\u53c2\u6570/ }), {
     target: { value: label },
   });
@@ -34,7 +38,9 @@ describe("simulation dashboard", () => {
     expect(screen.getByTestId("simulator-brand-mark")).toHaveAttribute("aria-hidden", "true");
     expect(screen.getByRole("heading", { level: 1, name: "本局模拟结果" })).toBeInTheDocument();
     expect(screen.getByText("当前参数已应用")).toBeInTheDocument();
-    expect(screen.getAllByRole("heading", { level: 2, name: "参数调整" })).toHaveLength(1);
+    expect(screen.getByRole("navigation", { name: "参数分类" })).toBeInTheDocument();
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /基础参数/ }));
     expect(screen.getByTestId("parameter-panel")).toBeInTheDocument();
     expect(screen.getByTestId("analysis-workspace")).toBeInTheDocument();
     expect(container.querySelector(".decision-rail")).toBeNull();
@@ -44,9 +50,7 @@ describe("simulation dashboard", () => {
     expect(within(topbar).getByText("海岛夺金 · 数值模拟")).toBeInTheDocument();
     expect(within(topbar).getByRole("button", { name: "运行仿真" })).toBeInTheDocument();
     expect(within(screen.getByTestId("parameter-sidebar")).queryByRole("tab")).toBeNull();
-
-    const tabs = within(topbar).getAllByRole("tab");
-    expect(tabs.map((tab) => tab.textContent)).toEqual(TABS);
+    expect(within(topbar).getAllByRole("tab").map((tab) => tab.textContent)).toEqual(TABS);
   }, 15000);
 
   test("keeps every configuration editor in ParameterPanel and results-only task and batch pages", () => {
@@ -201,36 +205,29 @@ describe("simulation dashboard", () => {
     expect(within(firstTask).getByText("0.200")).toBeInTheDocument();
   }, 15000);
 
-  test("places the synchronized map before supporting overview analysis", () => {
+  test("places the synchronized map before the supporting visual analysis", () => {
     const { container } = render(<SimulationDashboard />);
     const overview = screen.getByTestId("overview-report");
-    const mapSection = within(overview).getByRole("heading", { name: /地图回放/ }).closest("section");
-    const strategySection = within(overview).getByRole("heading", { name: "策略分布与实际表现" }).closest("section");
+    const mapRow = within(overview).getByTestId("overview-map-row");
+    const analytics = within(overview).getByTestId("overview-analytics-grid");
+    const mapSection = within(mapRow).getByRole("heading", { name: /战局地图/ }).closest("section");
 
     expect(mapSection).toHaveClass("overview-map-figure");
-    expect(mapSection!.compareDocumentPosition(strategySection!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(analytics).toContainElement(mapRow);
+    const strategic = within(analytics).getByRole("img", { name: "三联盟相对平均分差" }).closest("section")!;
+    expect(mapRow.compareDocumentPosition(strategic) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(container.querySelector(".overview-map-figure .map-canvas-wrap")).toBeInTheDocument();
-    expect(within(overview).getByRole("complementary", { name: "当前时刻指标" })).toBeInTheDocument();
+    expect(within(mapRow).getByRole("complementary", { name: "当前战况" })).toBeInTheDocument();
+    expect(within(analytics).getByRole("img", { name: "三联盟相对平均分差" })).toBeInTheDocument();
     expect(screen.queryByText(/共用同一实验上下文|唯一强视觉|读懂战局/)).not.toBeInTheDocument();
   }, 15000);
-  test("shows actual strategy analytics and the four-tier long-tail population summary", () => {
+  test("keeps the applied formation model beside the player contribution visualization", () => {
     render(<SimulationDashboard />);
 
-    expect(screen.getByRole("heading", { name: "策略分布与实际表现" })).toBeInTheDocument();
-    for (const strategy of ["中心争夺", "支援扩张", "多线推进"]) {
-      expect(screen.getByRole("row", { name: new RegExp(strategy) })).toBeInTheDocument();
-    }
-    expect(screen.getByText("中心地格争夺占比")).toBeInTheDocument();
-
-    expect(screen.getByRole("heading", { name: "四档战力分布" })).toBeInTheDocument();
-    for (const rowName of ["低战力 225", "中战力 60", "高战力 12", "超高战力 3"]) {
-      expect(screen.getByRole("row", { name: new RegExp(rowName) })).toBeInTheDocument();
-    }
-    expect(screen.getByText("1 / 2 / 3 / 3 主力编队")).toBeInTheDocument();
-    expect(screen.getByText("15× 超高/低档基础战力")).toBeInTheDocument();
-    expect(screen.getByText("联盟战力比")).toBeInTheDocument();
+    expect(screen.getByRole("img", { name: "玩家战力与活跃分层贡献" })).toBeInTheDocument();
+    expect(screen.getByTestId("main-formation-summary")).toHaveTextContent("1 / 2 / 3 / 3 主力编队");
+    expect(screen.getByText(/15× 超高\/低档基础战力/)).toHaveTextContent("联盟战力比");
   }, 15000);
-
   test("remeasures and redraws the map on container resize without leaking observers", () => {
     let width = 640;
     let height = 420;
@@ -284,7 +281,7 @@ describe("simulation dashboard", () => {
     vi.restoreAllMocks();
     Object.defineProperty(window, "devicePixelRatio", { configurable: true, value: 1 });
   });
-  test("removes a closed compact drawer from focus and accessibility, then restores focus", async () => {
+  test("keeps the compact category rail accessible while the editor opens as an overlay", async () => {
     let mediaListener: ((event: MediaQueryListEvent) => void) | undefined;
     const mediaQuery = {
       matches: true,
@@ -299,60 +296,100 @@ describe("simulation dashboard", () => {
     vi.stubGlobal("matchMedia", vi.fn(() => mediaQuery));
 
     render(<SimulationDashboard />);
-    const drawer = screen.getByTestId("parameter-sidebar");
+    const categories = screen.getByRole("navigation", { name: "参数分类" });
+    const populationTrigger = within(categories).getByRole("button", { name: /人口与战力/ });
     const workspace = screen.getByTestId("analysis-workspace");
-    const openToggle = screen.getByRole("button", { name: "展开参数调整" });
-    await waitFor(() => expect(drawer).toHaveAttribute("aria-hidden", "true"));
-    expect(drawer).toHaveAttribute("inert");
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
 
-    fireEvent.click(openToggle);
-    expect(drawer).not.toHaveAttribute("aria-hidden");
-    expect(drawer).not.toHaveAttribute("inert");
+    fireEvent.click(populationTrigger);
+    expect(screen.getByRole("dialog", { name: "人口与战力配置" })).toBeVisible();
     await waitFor(() => expect(screen.getByRole("searchbox", { name: "搜索参数" })).toHaveFocus());
 
     fireEvent.click(screen.getByRole("tab", { name: "战斗与士气" }));
-    await waitFor(() => expect(drawer).toHaveAttribute("inert"));
-    expect(drawer).toHaveAttribute("aria-hidden", "true");
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
     await waitFor(() => expect(workspace).toHaveFocus());
 
-    fireEvent.click(screen.getByRole("button", { name: "展开参数调整" }));
-    const closeToggle = screen.getByRole("button", { name: "收起参数调整" });
-    fireEvent.click(closeToggle);
-    expect(closeToggle).toHaveFocus();
+    fireEvent.click(populationTrigger);
+    expect(populationTrigger).toHaveAttribute("aria-expanded", "true");
+    expect(screen.queryByRole("button", { name: /^关闭$/ })).not.toBeInTheDocument();
+    fireEvent.click(populationTrigger);
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    await waitFor(() => expect(populationTrigger).toHaveFocus());
 
     act(() => mediaListener?.({ matches: false } as MediaQueryListEvent));
-    await waitFor(() => expect(drawer).not.toHaveAttribute("aria-hidden"));
-    expect(drawer).not.toHaveAttribute("inert");
+    expect(categories).toBeVisible();
     vi.unstubAllGlobals();
   }, 15000);
-  test("exposes an accessible responsive parameter drawer and map replay", () => {
+  test("exposes the overlay parameter editor and pointy-top map replay", () => {
     const { container } = render(<SimulationDashboard />);
-    const drawer = screen.getByTestId("parameter-sidebar");
-    const toggle = screen.getByRole("button", { name: "展开参数调整" });
+    const categories = screen.getByRole("navigation", { name: "参数分类" });
+    expect(screen.queryByTestId("parameter-sidebar")).not.toBeInTheDocument();
 
-    expect(drawer).toHaveClass("parameter-sidebar");
-    expect(drawer).toHaveAttribute("data-open", "false");
-    expect(toggle).toHaveAttribute("aria-expanded", "false");
-    fireEvent.click(toggle);
+    fireEvent.click(within(categories).getByRole("button", { name: /基础参数/ }));
+    const drawer = screen.getByTestId("parameter-sidebar");
+    expect(drawer).toHaveClass("parameter-editor-drawer");
     expect(drawer).toHaveAttribute("data-open", "true");
-    expect(screen.getByRole("button", { name: "收起参数调整" })).toHaveAttribute("aria-expanded", "true");
+    expect(drawer).toHaveAttribute("aria-modal", "true");
 
     expect(screen.getByRole("img", { name: /海岛地图，T\+48小时，尖顶六边形/ })).toBeInTheDocument();
     expect(screen.getByRole("slider", { name: "回放时间" })).toBeInTheDocument();
     expect(container.querySelector(".map-canvas-wrap")).toHaveAttribute("data-orientation", "pointy-top");
-    expect(dashboardStyles).toMatch(/@media\s*\(max-width:\s*900px\)[\s\S]*\.parameter-sidebar/);
-    expect(dashboardStyles).toMatch(/\.parameter-sidebar\[data-open="true"\]/);
   }, 15000);
-  test("keeps lightweight score visuals synchronized and opens a selected player's ledger", () => {
+  test("opens a visible player detail drawer with its own historical event time control", () => {
     render(<SimulationDashboard />);
-
-    expect(screen.getByRole("img", { name: "联盟相对均值差走势" })).toBeInTheDocument();
-    fireEvent.change(screen.getByRole("slider", { name: "回放时间" }), { target: { value: "0" } });
-    expect(screen.getByTestId("score-replay-hour")).toHaveTextContent("T+0h");
 
     fireEvent.click(screen.getByRole("tab", { name: "玩家与联盟排名" }));
     const playerButton = screen.getAllByRole("button", { name: /查看.+积分流水/ })[0];
     fireEvent.click(playerButton);
-    expect(screen.getByRole("region", { name: /积分流水/ })).toBeInTheDocument();
+
+    const playerDrawer = screen.getByRole("dialog", { name: /玩家详情/ });
+    expect(playerDrawer).toBeInTheDocument();
+    expect(within(playerDrawer).getByRole("region", { name: /积分流水/ })).toBeInTheDocument();
+    const eventTime = within(playerDrawer).getByRole("slider", { name: "玩家事件时间" });
+    expect(eventTime).toHaveValue("48");
+    fireEvent.change(eventTime, { target: { value: "0" } });
+    expect(eventTime).toHaveValue("0");
+    expect(within(playerDrawer).getByText("该时刻之前暂无积分事件")).toBeInTheDocument();
+
+    fireEvent.click(within(playerDrawer).getByRole("button", { name: "关闭玩家详情" }));
+    expect(screen.queryByRole("dialog", { name: /玩家详情/ })).not.toBeInTheDocument();
+  }, 15000);  test("keeps the parameter category rail visible and opens only the selected category in a drawer", () => {
+    render(<SimulationDashboard />);
+
+    const categories = screen.getByRole("navigation", { name: "参数分类" });
+    expect(within(categories).getAllByRole("button")).toHaveLength(11);
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+
+    const populationTrigger = within(categories).getByRole("button", { name: /人口与战力/ });
+    const moraleTrigger = within(categories).getByRole("button", { name: /^士气/ });
+    fireEvent.click(populationTrigger);
+    expect(screen.getByRole("dialog", { name: "人口与战力配置" })).toBeVisible();
+    expect(screen.getByLabelText("低战力基础战力")).toBeVisible();
+    expect(screen.queryByLabelText("随机种子")).not.toBeInTheDocument();
+    expect(populationTrigger).toHaveAttribute("aria-expanded", "true");
+    expect(screen.queryByRole("button", { name: /^关闭$/ })).not.toBeInTheDocument();
+
+    fireEvent.click(moraleTrigger);
+    expect(screen.getByRole("dialog", { name: "士气配置" })).toBeVisible();
+    expect(screen.getByLabelText("士气上限")).toBeVisible();
+    expect(populationTrigger).toHaveAttribute("aria-expanded", "false");
+    expect(moraleTrigger).toHaveAttribute("aria-expanded", "true");
+
+    fireEvent.click(moraleTrigger);
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(moraleTrigger).toHaveAttribute("aria-expanded", "false");
+    expect(screen.getByRole("navigation", { name: "参数分类" })).toBeVisible();
+  }, 15000);
+  test("keeps the map, current battle state, and three analytical charts in one overview", () => {
+    render(<SimulationDashboard />);
+
+    const overview = screen.getByTestId("overview-report");
+    const mapRow = within(overview).getByTestId("overview-map-row");
+    const analytics = within(overview).getByTestId("overview-analytics-grid");
+    expect(within(mapRow).getByRole("heading", { name: /战局地图/ })).toBeInTheDocument();
+    expect(within(mapRow).getByRole("complementary", { name: "当前战况" })).toBeInTheDocument();
+    expect(within(analytics).getByRole("img", { name: "三联盟相对平均分差" })).toBeInTheDocument();
+    expect(within(analytics).getByRole("img", { name: "每小时战斗与占领节奏" })).toBeInTheDocument();
+    expect(within(analytics).getByRole("img", { name: "玩家战力与活跃分层贡献" })).toBeInTheDocument();
   }, 15000);
 });

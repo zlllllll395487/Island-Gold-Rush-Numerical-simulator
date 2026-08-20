@@ -412,11 +412,10 @@
 }
 
 @media (max-width: 560px) {
-  .parameter-task-row {
+  .parameter-group__controls > .parameter-control {
     grid-template-columns: minmax(0, 1fr);
   }
-
-  .parameter-task-row > strong {
-    grid-column: auto;
-  }
+  .parameter-matrix { min-width: 720px; }
+  .parameter-task-table { min-width: 520px; }
+  .parameter-task-table .parameter-task-row { display: table-row; }
 }

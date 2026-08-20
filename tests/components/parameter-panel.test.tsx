@@ -38,19 +38,23 @@ function meaningfulLeafPaths(value: unknown, prefix = ""): string[] {
   return [prefix];
 }
 
-function renderPanel(draft: SimulationConfig = structuredClone(DEFAULT_CONFIG)) {
+function renderPanel(
+  draft: SimulationConfig = structuredClone(DEFAULT_CONFIG),
+  activeGroup: (typeof PARAMETER_GROUPS)[number]["id"] = "basic",
+  validation: Array<{ id: string; message: string }> = [],
+) {
   const onChange = vi.fn();
   const onReset = vi.fn();
   const result = render(
-    <ParameterPanel draft={draft} validation={[]} onChange={onChange} onReset={onReset} />,
+    <ParameterPanel
+      activeGroup={activeGroup}
+      draft={draft}
+      validation={validation}
+      onChange={onChange}
+      onReset={onReset}
+    />,
   );
   return { ...result, onChange, onReset };
-}
-
-function selectGroup(groupId: (typeof PARAMETER_GROUPS)[number]["id"]) {
-  const group = PARAMETER_GROUPS.find((entry) => entry.id === groupId)!;
-  const navigation = screen.getByRole("navigation", { name: /\u53c2\u6570\u5206\u7c7b/ });
-  fireEvent.click(within(navigation).getByRole("button", { name: new RegExp(group.label) }));
 }
 
 describe("parameter catalog", () => {
@@ -106,115 +110,92 @@ describe("parameter catalog", () => {
 });
 
 describe("parameter panel", () => {
-  test("renders an eleven-chapter vertical inspector with native controls and compact task rows", () => {
-    const { container } = renderPanel();
-    const panel = screen.getByTestId("parameter-panel");
-    const navigation = screen.getByRole("navigation", { name: /\u53c2\u6570\u5206\u7c7b/ });
+  test("renders one selected chapter with native controls and compact task rows", () => {
+    const basic = renderPanel();
+    expect(screen.getByTestId("parameter-panel")).toHaveAttribute("data-layout", "vertical");
+    expect(screen.queryByTestId("parameter-category-nav")).not.toBeInTheDocument();
+    expect(basic.container.querySelector('input[type="number"]')).not.toBeNull();
+    basic.unmount();
 
-    expect(panel).toHaveAttribute("data-layout", "vertical");
-    expect(within(navigation).getAllByRole("button")).toHaveLength(11);
-    for (const name of GROUP_NAMES) {
-      expect(within(navigation).getByRole("button", { name: new RegExp(name) })).toBeInTheDocument();
-    }
-    expect(container.querySelector('input[type="number"]')).not.toBeNull();
+    const strategy = renderPanel(undefined, "strategy");
+    expect(strategy.container.querySelector('input[type="range"]')).not.toBeNull();
+    strategy.unmount();
 
-    selectGroup("strategy");
-    expect(container.querySelector('input[type="range"]')).not.toBeNull();
-    selectGroup("morale");
-    expect(container.querySelector("select")).not.toBeNull();
+    const morale = renderPanel(undefined, "morale");
+    expect(morale.container.querySelector("select")).not.toBeNull();
+    morale.unmount();
 
-    selectGroup("tasksRewards");
+    const tasks = renderPanel(undefined, "tasksRewards");
     const taskRows = screen.getAllByTestId(/^task-row-/);
     expect(taskRows).toHaveLength(10);
-    expect(taskRows[0]).toHaveClass("parameter-task-row");
-    for (const row of taskRows) {
-      expect(row.querySelectorAll(".parameter-control")).toHaveLength(3);
-    }
-    expect(container.querySelector("details, summary")).toBeNull();
+    for (const row of taskRows) expect(row.querySelectorAll(".parameter-control")).toHaveLength(3);
+    expect(tasks.container.querySelector("details, summary")).toBeNull();
   });
 
-  test("renders every chapter together and uses the category index as smooth anchors", () => {
-    const scrollIntoView = vi.fn();
-    Object.defineProperty(HTMLElement.prototype, "scrollIntoView", { configurable: true, value: scrollIntoView });
-    try {
-      renderPanel();
-
-      expect(screen.getAllByTestId(/^parameter-section-/)).toHaveLength(11);
-      expect(screen.getByTestId("parameter-section-basic")).toBeVisible();
-      expect(screen.getByTestId("parameter-section-tasksRewards")).toBeVisible();
-
-      const navigation = screen.getByRole("navigation", { name: "参数分类" });
-      fireEvent.click(within(navigation).getByRole("button", { name: /任务与奖励/ }));
-      expect(scrollIntoView).toHaveBeenCalledWith({ behavior: "smooth", block: "start" });
-    } finally {
-      delete (HTMLElement.prototype as { scrollIntoView?: unknown }).scrollIntoView;
-    }
+  test("renders only the selected chapter and no internal category navigation", () => {
+    renderPanel(undefined, "tasksRewards");
+    expect(screen.getAllByTestId(/^parameter-section-/)).toHaveLength(1);
+    expect(screen.getByTestId("parameter-section-tasksRewards")).toBeVisible();
+    expect(screen.queryByTestId("parameter-section-basic")).not.toBeInTheDocument();
+    expect(screen.queryByRole("navigation", { name: "参数分类" })).not.toBeInTheDocument();
   });
   test("organizes power tiers and tasks into readable parameter tables", () => {
-    renderPanel();
-
+    const population = renderPanel(undefined, "population");
     const populationTable = screen.getByRole("table", { name: "人口与战力参数" });
     expect(within(populationTable).getAllByRole("row")).toHaveLength(5);
     expect(within(populationTable).getByRole("row", { name: /超高战力/ })).toBeInTheDocument();
+    expect(screen.getByLabelText("超高战力普通编队强度")).toBeInTheDocument();
+    population.unmount();
 
+    renderPanel(undefined, "tasksRewards");
     const taskTable = screen.getByRole("table", { name: "任务参数" });
     expect(within(taskTable).getAllByRole("row")).toHaveLength(11);
-    expect(screen.getByLabelText("超高战力普通编队强度")).toBeInTheDocument();
     expect(screen.getByLabelText("任务 10 奖励价值")).toBeInTheDocument();
   });
   test("shows the approved 45/25/30 strategy mix", () => {
-    renderPanel();
-    selectGroup("strategy");
-
+    renderPanel(undefined, "strategy");
     expect(screen.getByLabelText("中心争夺策略占比")).toHaveValue("45");
     expect(screen.getByLabelText("支援扩张策略占比")).toHaveValue("25");
     expect(screen.getByLabelText("多线推进策略占比")).toHaveValue("30");
   });
 
   test("keeps every chapter default within native min, max, and step constraints", () => {
-    renderPanel();
     const invalidDefaults: string[] = [];
-
     for (const group of PARAMETER_GROUPS) {
+      const rendered = renderPanel(undefined, group.id);
       for (const entry of PARAMETER_CATALOG.filter((candidate) => candidate.group === group.id)) {
         const control = screen.getByLabelText(entry.label);
-        if (!(control instanceof HTMLInputElement)) continue;
-        if (!control.validity.valid) {
-          invalidDefaults.push(entry.path + ": value=" + control.value + ", min=" + control.min + ", max=" + control.max + ", step=" + control.step);
+        if (control instanceof HTMLInputElement && !control.validity.valid) {
+          invalidDefaults.push(`${entry.path}: value=${control.value}, min=${control.min}, max=${control.max}, step=${control.step}`);
         }
       }
+      rendered.unmount();
     }
-
     expect(invalidDefaults).toEqual([]);
   });
 
   test("re-entering every chapter default preserves the exact config leaf", () => {
-    renderPanel();
     const driftedPaths: string[] = [];
-
     for (const group of PARAMETER_GROUPS) {
+      const rendered = renderPanel(undefined, group.id);
       for (const entry of PARAMETER_CATALOG.filter((candidate) => candidate.group === group.id)) {
         const control = screen.getByLabelText(entry.label) as HTMLInputElement | HTMLSelectElement;
         const current = getParameterValue(DEFAULT_CONFIG, entry.path);
         const normalized = normalizeParameterInput(entry, current, control.value);
-        if (normalized === null || !Object.is(normalized, current)) {
-          driftedPaths.push(entry.path);
-        }
+        if (normalized === null || !Object.is(normalized, current)) driftedPaths.push(entry.path);
       }
+      rendered.unmount();
     }
-
     expect(driftedPaths).toEqual([]);
   });
 
-  test("filters controls by parameter name without changing the vertical layout", () => {
-    renderPanel();
-
+  test("filters controls inside the selected category without changing the vertical layout", () => {
+    renderPanel(undefined, "population");
     fireEvent.change(screen.getByRole("searchbox", { name: "搜索参数" }), {
       target: { value: "超高战力普通编队强度" },
     });
-
     expect(screen.getByLabelText("超高战力普通编队强度")).toBeInTheDocument();
-    expect(screen.queryByLabelText("随机种子")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("低战力基础战力")).not.toBeInTheDocument();
     expect(screen.getByTestId("parameter-panel")).toHaveAttribute("data-layout", "vertical");
   });
 
@@ -264,11 +245,8 @@ describe("parameter panel", () => {
   });
 
   test("clamps a scaled percentage in displayed units before applying its scale", () => {
-    const { onChange } = renderPanel();
-    selectGroup("tasksRewards");
-
+    const { onChange } = renderPanel(undefined, "tasksRewards");
     fireEvent.change(screen.getByLabelText("任务 1 目标覆盖率"), { target: { value: "250" } });
-
     const next = onChange.mock.lastCall?.[0] as SimulationConfig;
     expect(next.tasks.targetCoverage[0]).toBe(1);
   });
@@ -315,20 +293,15 @@ describe("parameter panel", () => {
   test("keeps draft validation visible and reports invalid dependent totals", () => {
     const draft = structuredClone(DEFAULT_CONFIG);
     draft.strategy.shares.centerRush = 0.5;
-    render(
-      <ParameterPanel
-        draft={draft}
-        validation={[{ id: "ap.initial.too_big", message: "行动力初始值不能超过上限" }]}
-        onChange={vi.fn()}
-        onReset={vi.fn()}
-      />,
+    renderPanel(
+      draft,
+      "strategy",
+      [{ id: "ap.initial.too_big", message: "行动力初始值不能超过上限" }],
     );
-
-    selectGroup("strategy");
 
     const alerts = screen.getAllByRole("alert");
     expect(alerts.some((alert) => within(alert).queryByText("行动力初始值不能超过上限"))).toBe(true);
     expect(alerts.some((alert) => /策略占比合计必须为 100%/.test(alert.textContent ?? ""))).toBe(true);
-    expect(screen.getByText("策略占比合计 105%")) .toBeInTheDocument();
+    expect(screen.getByText("策略占比合计 105%")).toBeInTheDocument();
   });
 });

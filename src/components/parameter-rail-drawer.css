@@ -1,0 +1,278 @@
+.simulation-app.editorial-workspace {
+  --parameter-rail-width: 164px;
+  --parameter-drawer-width: 440px;
+  grid-template-columns: var(--parameter-rail-width) minmax(0, 1fr);
+}
+
+.editorial-workspace .parameter-category-rail {
+  grid-column: 1;
+  grid-row: 2;
+  position: sticky;
+  top: 72px;
+  z-index: 8;
+  align-self: start;
+  height: calc(100vh - 72px);
+  padding: 24px 14px;
+  overflow: hidden;
+  background: var(--editorial-paper);
+  border-right: 1px solid var(--editorial-rule);
+}
+
+.editorial-workspace .parameter-category-rail h2 {
+  margin: 0 8px 16px;
+  font-family: var(--editorial-serif);
+  font-size: 17px;
+  font-weight: var(--heading-weight);
+  white-space: nowrap;
+}
+
+.editorial-workspace .parameter-category-rail__items {
+  display: grid;
+  gap: 2px;
+}
+
+.editorial-workspace .parameter-category-rail button {
+  display: grid;
+  grid-template-columns: 7px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 7px;
+  min-height: 42px;
+  padding: 0 7px;
+  color: var(--editorial-muted);
+  background: transparent;
+  border: 0;
+  text-align: left;
+  white-space: nowrap;
+  font-size: 12.5px;
+  font-weight: 550;
+  cursor: pointer;
+}
+
+.editorial-workspace .parameter-category-rail button::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  background: transparent;
+}
+
+.editorial-workspace .parameter-category-rail button[aria-current="page"] {
+  color: var(--editorial-ink);
+  font-weight: 650;
+}
+
+.editorial-workspace .parameter-category-rail button[aria-current="page"]::before {
+  background: var(--editorial-accent);
+}
+
+.editorial-workspace .parameter-category-rail button span,
+.editorial-workspace .parameter-category-rail button small {
+  white-space: nowrap;
+}
+
+.editorial-workspace .parameter-category-rail button small {
+  color: var(--editorial-muted);
+  font-size: 10.5px;
+  font-variant-numeric: tabular-nums;
+}
+
+.editorial-workspace .analysis-shell {
+  grid-column: 2;
+  grid-row: 2;
+}
+
+.editorial-workspace .parameter-drawer-backdrop {
+  position: fixed;
+  inset: 72px 0 0 var(--parameter-rail-width);
+  z-index: 40;
+  padding: 0;
+  background: color-mix(in srgb, var(--editorial-ink) 12%, transparent);
+  border: 0;
+  cursor: default;
+}
+
+.editorial-workspace .parameter-editor-drawer {
+  position: fixed;
+  inset: 72px auto 0 var(--parameter-rail-width);
+  z-index: 41;
+  width: min(var(--parameter-drawer-width), calc(100vw - var(--parameter-rail-width)));
+  overflow: auto;
+  background: var(--editorial-paper);
+  border-right: 1px solid var(--editorial-rule);
+  box-shadow: 18px 0 38px color-mix(in srgb, var(--editorial-ink) 13%, transparent);
+}
+
+.editorial-workspace .parameter-editor-drawer__close {
+  position: absolute;
+  top: 19px;
+  right: 18px;
+  z-index: 2;
+  padding: 7px 11px;
+  color: var(--editorial-ink);
+  background: transparent;
+  border: 1px solid var(--editorial-rule);
+  font-size: 12.5px;
+  font-weight: 550;
+  cursor: pointer;
+}
+
+.editorial-workspace .parameter-editor-drawer .parameter-panel {
+  display: block;
+  min-height: 100%;
+  padding: 18px 20px 32px;
+}
+
+.editorial-workspace .parameter-editor-drawer .parameter-panel__header,
+.editorial-workspace .parameter-editor-drawer .parameter-search,
+.editorial-workspace .parameter-editor-drawer .parameter-panel__groups,
+.editorial-workspace .parameter-editor-drawer .parameter-search-results,
+.editorial-workspace .parameter-editor-drawer .parameter-validation,
+.editorial-workspace .parameter-editor-drawer .parameter-empty {
+  grid-column: auto;
+}
+
+.editorial-workspace .parameter-editor-drawer .parameter-panel__header {
+  padding-right: 72px;
+}
+
+.editorial-workspace .parameter-editor-drawer .parameter-panel__header > button {
+  margin-right: 66px;
+}
+
+.editorial-workspace .parameter-editor-drawer .parameter-group {
+  border: 0;
+}
+
+.editorial-workspace .parameter-editor-drawer .parameter-group__header {
+  display: none;
+}
+
+.simulation-app.editorial-workspace .parameter-editor-drawer .parameter-table-wrap {
+  overflow: visible;
+}
+
+.simulation-app.editorial-workspace .parameter-editor-drawer .parameter-matrix,
+.simulation-app.editorial-workspace .parameter-editor-drawer .parameter-task-table {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  table-layout: auto;
+}
+
+.simulation-app.editorial-workspace .parameter-editor-drawer .parameter-matrix thead,
+.simulation-app.editorial-workspace .parameter-editor-drawer .parameter-task-table thead {
+  display: none;
+}
+
+.simulation-app.editorial-workspace .parameter-editor-drawer .parameter-matrix tbody,
+.simulation-app.editorial-workspace .parameter-editor-drawer .parameter-task-table tbody {
+  display: grid;
+  gap: 12px;
+}
+
+.simulation-app.editorial-workspace .parameter-editor-drawer .parameter-matrix tr,
+.simulation-app.editorial-workspace .parameter-editor-drawer .parameter-task-table tr {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px 12px;
+  padding: 13px 0 15px;
+  border-top: 1px solid var(--editorial-rule);
+}
+
+.simulation-app.editorial-workspace .parameter-editor-drawer .parameter-task-table tr {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.simulation-app.editorial-workspace .parameter-editor-drawer .parameter-matrix tr > th,
+.simulation-app.editorial-workspace .parameter-editor-drawer .parameter-task-table tr > th {
+  grid-column: 1 / -1;
+  width: auto;
+  padding: 0;
+  color: var(--editorial-ink);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.simulation-app.editorial-workspace .parameter-editor-drawer .parameter-matrix td,
+.simulation-app.editorial-workspace .parameter-editor-drawer .parameter-task-table td {
+  display: block;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+}
+
+.simulation-app.editorial-workspace .parameter-editor-drawer .parameter-matrix td::before,
+.simulation-app.editorial-workspace .parameter-editor-drawer .parameter-task-table td::before {
+  content: attr(data-label);
+  display: block;
+  min-height: 16px;
+  margin-bottom: 5px;
+  overflow: hidden;
+  color: var(--editorial-muted);
+  font-size: 10.5px;
+  font-weight: 600;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.simulation-app.editorial-workspace .parameter-editor-drawer .parameter-matrix .parameter-control,
+.simulation-app.editorial-workspace .parameter-editor-drawer .parameter-task-table .parameter-control {
+  width: 100%;
+  min-width: 0;
+}
+
+.simulation-app.editorial-workspace .parameter-editor-drawer .parameter-matrix input,
+.simulation-app.editorial-workspace .parameter-editor-drawer .parameter-matrix select,
+.simulation-app.editorial-workspace .parameter-editor-drawer .parameter-task-table input,
+.simulation-app.editorial-workspace .parameter-editor-drawer .parameter-task-table select {
+  width: 100%;
+  min-width: 0;
+}
+@media (max-width: 900px) {
+  .simulation-app.editorial-workspace {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto 56px minmax(0, 1fr);
+  }
+
+  .editorial-workspace .parameter-category-rail {
+    grid-column: 1;
+    grid-row: 2;
+    position: sticky;
+    top: 108px;
+    width: 100%;
+    height: 56px;
+    padding: 0 12px;
+    overflow-x: auto;
+    border-right: 0;
+    border-bottom: 1px solid var(--editorial-rule);
+  }
+
+  .editorial-workspace .parameter-category-rail h2 {
+    display: none;
+  }
+
+  .editorial-workspace .parameter-category-rail__items {
+    display: flex;
+    min-width: max-content;
+  }
+
+  .editorial-workspace .parameter-category-rail button {
+    grid-template-columns: 6px auto auto;
+    min-height: 55px;
+    padding-inline: 10px;
+  }
+
+  .editorial-workspace .analysis-shell {
+    grid-column: 1;
+    grid-row: 3;
+  }
+
+  .editorial-workspace .parameter-drawer-backdrop {
+    inset: 164px 0 0;
+  }
+
+  .editorial-workspace .parameter-editor-drawer {
+    inset: 164px auto 0 0;
+    width: min(440px, 100vw);
+  }
+}

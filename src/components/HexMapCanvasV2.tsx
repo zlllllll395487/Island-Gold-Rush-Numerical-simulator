@@ -159,13 +159,47 @@ function drawBattle(context: CanvasRenderingContext2D, center: Point, radius: nu
   context.stroke();
 }
 
-function fillFor(tile: MapTile, owner: 0 | 1 | 2 | 3) {
+export type MapViewMode = "ownership" | "heat" | "value";
+
+export function tileStrategicValue(tile: MapTile): number {
+  if (tile.configId === 30003) return 5;
+  if (tile.configId === 30002) return 3;
+  if (tile.configId === 20001) return 2;
+  if (tile.configId === 30001) return 1;
+  return 0;
+}
+
+export function mapTileFill(
+  tile: MapTile,
+  owner: 0 | 1 | 2 | 3,
+  mode: MapViewMode,
+  battleHeat: number,
+  maxBattleHeat: number,
+) {
+  if (mode === "heat") {
+    const intensity = Math.max(0, Math.min(1, battleHeat / Math.max(1, maxBattleHeat)));
+    return `hsl(${18 - intensity * 12} 72% ${34 + intensity * 25}%)`;
+  }
+  if (mode === "value") {
+    const value = tileStrategicValue(tile);
+    return value === 0 ? "#32454a" : `hsl(${52 - value * 4} 76% ${29 + value * 7}%)`;
+  }
   if (tile.configId === 40001) return "#596574";
   if (tile.configId === 40002) return "#4f9c86";
   return CAMP_COLORS[owner];
 }
 
-export function HexMapCanvasV2({ map, snapshot }: { map: NormalizedMap; snapshot: ReplaySnapshot }) {
+export function HexMapCanvasV2({
+  map,
+  snapshot,
+  mode = "ownership",
+  battleHeat = {},
+}: {
+  map: NormalizedMap;
+  snapshot: ReplaySnapshot;
+  mode?: MapViewMode;
+  battleHeat?: Readonly<Record<number, number>>;
+}) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const layoutRef = useRef<PointyTopLayout | null>(null);
   const [hover, setHover] = useState<{ tileId: TileId; x: number; y: number } | null>(null);
@@ -184,11 +218,12 @@ export function HexMapCanvasV2({ map, snapshot }: { map: NormalizedMap; snapshot
     const layout = layoutPointyTopMap(map.tiles, width, height, 14);
     layoutRef.current = layout;
 
+    const maxBattleHeat = Math.max(1, ...Object.values(battleHeat));
     for (const tile of map.tiles) {
       const center = layout.centers.get(tile.tileId)!;
       const owner = (snapshot.owners[tile.tileId] ?? 0) as 0 | 1 | 2 | 3;
       traceHex(context, center, layout.radius);
-      context.fillStyle = fillFor(tile, owner);
+      context.fillStyle = mapTileFill(tile, owner, mode, battleHeat[tile.tileId] ?? 0, maxBattleHeat);
       context.fill();
       context.strokeStyle = hover?.tileId === tile.tileId ? "#ffffff" : "rgba(8,24,31,.72)";
       context.lineWidth = hover?.tileId === tile.tileId ? Math.max(1.5, layout.radius * 0.09) : Math.max(0.7, layout.radius * 0.045);
@@ -211,7 +246,7 @@ export function HexMapCanvasV2({ map, snapshot }: { map: NormalizedMap; snapshot
         context.stroke();
       }
     }
-  }, [map, snapshot, hover?.tileId]);
+  }, [map, snapshot, mode, battleHeat, hover?.tileId]);
 
   useEffect(() => {
     draw();
@@ -240,7 +275,7 @@ export function HexMapCanvasV2({ map, snapshot }: { map: NormalizedMap; snapshot
   const tile = hover ? map.byId.get(hover.tileId) : null;
   const status = hover ? snapshot.tileStatus[hover.tileId] : null;
   return (
-    <div className="map-canvas-wrap" data-orientation="pointy-top">
+    <div className="map-canvas-wrap" data-orientation="pointy-top" data-mode={mode}>
       <canvas
         ref={canvasRef}
         className="map-canvas"
