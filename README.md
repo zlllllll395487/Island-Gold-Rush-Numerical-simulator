@@ -2,7 +2,13 @@
 
 [Open the live simulator](https://zlllllll395487.github.io/Island-Gold-Rush-Numerical-simulator/)
 
-![海岛夺金数值模拟界面](public/og-v3.png)
+### 仿真总览
+
+![海岛夺金数值模拟器仿真总览](public/og-v3.png)
+
+### 玩家排名与积分流水
+
+![海岛夺金数值模拟器玩家排名与积分流水](public/player-ranking-score-history.png)
 
 一个可交互、可重复运行的网页数值模拟器，用于观察多人联盟玩法中，行动力、占领时长、战力分布、活跃度、士气、任务奖励与积分规则之间的联动影响。
 
